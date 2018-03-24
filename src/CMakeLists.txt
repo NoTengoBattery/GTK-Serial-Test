@@ -21,5 +21,6 @@
 SET ( THIS_EXE_NAME Serial )
 
 # Agrega el ejecutable
-ADD_EXECUTABLE ( ${THIS_EXE_NAME} main.c )
+ADD_EXECUTABLE ( ${THIS_EXE_NAME}
+                 main.c )
 TARGET_LINK_LIBRARIES ( ${THIS_EXE_NAME} ${GTK3_STATIC_LIBRARIES} )
