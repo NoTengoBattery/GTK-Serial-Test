@@ -20,9 +20,18 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define APP_ID          "com.notengo.battery.gtk_serial"
-#define APP_MAIN_TITLE  "GTK Serial"
-#define APP_SWI_SIZE    8
-#define APP_SWO_SIZE    8
+#define APP_ID                          "com.notengo.battery.gtk_serial"
+#define APP_SWI_SIZE                    8
+#define APP_SWO_SIZE                    8
+#define APP_IDX_FORMAT                  "%02d"
+#define APP_HEX_ZERO                    "0x00"
+
+#define APP_STR_MAIN_TITLE              "GTK Serial"
+#define APP_STR_SEND_BYTE               "Enviar byte"
+#define APP_STR_ASCII                   "ASCII"
+#define APP_STR_DEC                     "DEC"
+#define APP_STR_HEX                     "HEX"
+#define APP_STR_OCT                     "OCT"
+#define APP_STR_BIN                     "BIN"
 
 #endif // CONFIG_H
