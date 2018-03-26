@@ -20,7 +20,42 @@
 #   -> GTK+ 3.0
 #   -> Cualquier generador soportado por CMake y su respectivo ambiente
 #
-# Este programa funciona en Windows, macOS y Linux
+# Este programa funciona en Windows, macOS y Linux.
+#
+# # macOS
+#   Es necesario instalar macports. Macports, a su vez, tiene como dependencia Xcode. Esto quiere decir que hay que
+#   instalar Xcode y después macports.
+#
+#   Desde macports se puede instalar GTK (variante Quartz): `port install gtk3 +quartz`
+#   También se puede conseguir CMake: `port install cmake`
+#   pkg-config es parte de Xcode y la mayoría de paquetes de macports lo utilizan
+#   Apple provee una versión de Clang junto con Xcode y el SDK de macOS (Cocoa/Quartz)
+#   De la misma cuenta, Apple provee versiones de Git y de GNU Make.
+#
+# # Windows
+#   GTK no se puede desarrollar directamente sobre Windows. El primer paso fundamental es adquirir el entorno de
+#   desarrollo Mingw64. Este se consigue mediante [MSYS2](https://www.msys2.org). Esta aplicación no soporta
+#   (oficialmente) ningún otro entorno.
+#
+#   Luego de configurar MSYS2, desde la terminal de Mingw64 o Mingw32 se deben instalar los siguientes paquetes para
+#   Windows de 64 bits
+#     -> Instalar pgk-config desde el paquete `mingw-w64-x86_64-pkg-config`
+#     -> Instalar CMake desde el paquete `mingw-w64-x86_64-cmake`
+#     -> Instalar un compilador, ya sea GCC desde el paquete `mingw-w64-x86_64-gcc`
+#        o Clang desde el paquete `mingw-w64-x86_64-clang`
+#     -> Es buena idea instalar un depurador (opcional) desde los paquetes `mingw-w64-x86_64-lldb` para LLDB
+#        o `mingw-w64-x86_64-gdb` para GDB
+#     -> Se necesita un generador para CMake. Se puede usar ninja, pero make es más conveniente. Se instala desde el
+#        paquete `mingw-w64-x86_64-make`
+#     -> Finalmente, se instala GTK 3 desde el paquete `mingw-w64-x86_64-gtk3`
+#
+# # Linux
+#   Los paquetes necesarios son:
+#     -> cmake
+#     -> base-devel
+#     -> gtk3
+#     -> pkg-config
+#     -> clang/gcc
 #
 #===---------------------------------------------------------------------------------------------------------------===//
 
