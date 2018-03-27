@@ -20,7 +20,6 @@
 #include "config.h"
 #include <gtk/gtk.h>
 #include <memory.h>
-#include <regex.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #ifdef _WIN32
@@ -42,8 +41,6 @@ GtkWidget *hex_tbo;
 GtkWidget *send_bto;
 GSList *format_rbg;
 volatile char *print_format;
-regex_t charmask_pattern;
-int charmask_pattern_rc;
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                   Funciones extra
@@ -106,8 +103,7 @@ void on_inputhex_change(GtkEditable *editable, gpointer user_data) {
   const char *ctext = gtk_entry_get_text(GTK_ENTRY(editable));
   uint8_t parsed_value = 0x00;
   if (strcmp((const char *) print_format, APP_STR_ASCII)==0) {
-    charmask_pattern_rc = regexec(&charmask_pattern, ctext, 0, NULL, 0);
-    if (!charmask_pattern_rc) {
+    if (ctext[0]=='\'' && ctext[2]=='\'') {
       parsed_value = (uint8_t) *(ctext + 1);
     }
   } else if (strcmp((const char *) print_format, APP_STR_HEX)==0) {
@@ -217,12 +213,6 @@ static void activate(GtkApplication *app, gpointer user_data) {
 //===--------------------------------------------------------------------------------------------------------------===//
 int main(int argc, char **argv) {
   // Reservar memoria
-  //    -> Compilar la regex
-  charmask_pattern_rc = regcomp(&charmask_pattern, "\'.\'", 0);
-  if (charmask_pattern_rc) {
-    fprintf(stderr, "No se ha podido compilar la regex.\n");
-    exit(1);
-  }
 
   // Crea una nueva aplicación de GTK
   GtkApplication *app;
@@ -238,7 +228,6 @@ int main(int argc, char **argv) {
   g_object_unref(app);
 
   // Libera memoria
-  regfree(&charmask_pattern);
 
   // Retorna
   return status;
