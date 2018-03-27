@@ -19,6 +19,3 @@
 
 # AbSerIO: Abstract Serial IO
 ADD_SUBDIRECTORY ( abserio )
-
-# Usar este directorio en los include
-INCLUDE_DIRECTORIES ( ${CMAKE_CURRENT_LIST_DIR} )

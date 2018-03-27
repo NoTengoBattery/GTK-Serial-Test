@@ -28,10 +28,24 @@ IF ( WIN32 )
 ELSEIF ( UNIX )
   SET ( LIB_PLATFORM_SOURCES posix_alloc.c )
 ELSE ()
-  MESSAGE ( FATAL_ERROR "This library is supported on the following platforms: POSIX like macOS or Linux and Win32." )
+  MESSAGE ( FATAL_ERROR
+            "This library is supported on the following platforms: POSIX like macOS or Linux and Win32." )
 ENDIF ()
+
+# Dependemos de glib
+PKG_CHECK_MODULES ( GLIB REQUIRED glib-2.0 )
+
+# Agrega los encabezados y las bibliotecas de glib
+LINK_DIRECTORIES ( ${GLIB_LIBRARY_DIRS} )
+# Banderas extras para LD
+STRING ( REPLACE ";" " " GLIB_LDFLAGS_LD "${GLIB_LDFLAGS_OTHER}" )
+SET ( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GLIB_LDFLAGS_LD}" )
 
 
 # Agrega el ejecutable
 ADD_LIBRARY ( ${THIS_LIB_NAME} STATIC EXCLUDE_FROM_ALL ${LIB_PLATFORM_SOURCES}
               abserio.h )
+
+# Agrega los encabezados y las bibliotecas de glib
+TARGET_INCLUDE_DIRECTORIES ( ${THIS_LIB_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} )
+TARGET_LINK_LIBRARIES ( ${THIS_LIB_NAME} ${GLIB_LIBRARIES} )

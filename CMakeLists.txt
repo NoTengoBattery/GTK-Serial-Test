@@ -92,6 +92,10 @@ SET ( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GTK3_LDFLAGS_LD}" )
 # Proyecto de CMake para C
 PROJECT ( GTK_SERIAL C )
 
-ADD_SUBDIRECTORY ( src )
+
+# Contiene las bibliotecas que se compilan in-source
 ADD_SUBDIRECTORY ( lib )
+INCLUDE_DIRECTORIES ( lib )
+# Contiene el proyecto principal
+ADD_SUBDIRECTORY ( src )
 

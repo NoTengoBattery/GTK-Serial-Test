@@ -26,12 +26,17 @@
 #define APP_IDX_FORMAT                  "%02d"
 #define APP_HEX_ZERO                    "0x00"
 
-#define APP_STR_MAIN_TITLE              "GTK Serial"
+#define APP_STR_MAIN_TITLE              "GTK Serial Tester"
 #define APP_STR_SEND_BYTE               "Enviar byte"
 #define APP_STR_ASCII                   "ASCII"
 #define APP_STR_DEC                     "DEC"
 #define APP_STR_HEX                     "HEX"
 #define APP_STR_OCT                     "OCT"
 #define APP_STR_BIN                     "BIN"
+#define APP_SERIAL_DIALOG_TITLE         "Seleccionar el puerto serial"
+#define APP_OK                          "Aceptar"
+#define APP_CANCEL                      "Cancelar"
+#define APP_DIALOG_ASK_MSG_WIN          "Ingrese el número del puerto COM:"
+#define APP_DIALOG_ASK_MSG_POS          "Ingrese la ruta hacia el archivo del puerto:"
 
 #endif // CONFIG_H

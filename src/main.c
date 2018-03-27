@@ -20,8 +20,9 @@
 #include "config.h"
 #include <gtk/gtk.h>
 #include <memory.h>
-#include <stdatomic.h>
 #include <stdlib.h>
+#include <abserio/abserio.h>
+#include <errno.h>
 #ifdef _WIN32
 #include <stdint.h>
 #endif
@@ -41,16 +42,18 @@ GtkWidget *hex_tbo;
 GtkWidget *send_bto;
 GSList *format_rbg;
 volatile char *print_format;
+struct AbstractSerialDevice *abstract_port;
+GString *os_port;
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                   Funciones extra
 //===--------------------------------------------------------------------------------------------------------------===//
 void print_formatted_input(void) {
   // Obtiene el valor binario a partir de lo switches
-  uint8_t val = 0x00;
+  unsigned long val = 0x00;
   for (int i = 0; i < APP_SWI_SIZE; i++) {
-    uint8_t binval = (uint8_t) gtk_switch_get_state(GTK_SWITCH(input_swi[i]));
-    binval = (uint8_t) (binval & 0x01);
+    unsigned long binval = (unsigned long) gtk_switch_get_state(GTK_SWITCH(input_swi[i]));
+    binval = (binval & 0x01);
     val |= binval << i;
   }
   char *use_format = "";
@@ -101,23 +104,23 @@ void on_radiobtn_change(GtkToggleButton *togglebutton, gpointer user_data) {
 
 void on_inputhex_change(GtkEditable *editable, gpointer user_data) {
   const char *ctext = gtk_entry_get_text(GTK_ENTRY(editable));
-  uint8_t parsed_value = 0x00;
+  unsigned long parsed_value = 0x00;
   if (strcmp((const char *) print_format, APP_STR_ASCII)==0) {
     if (ctext[0]=='\'' && ctext[2]=='\'') {
-      parsed_value = (uint8_t) *(ctext + 1);
+      parsed_value = (unsigned long) *(ctext + 1);
     }
   } else if (strcmp((const char *) print_format, APP_STR_HEX)==0) {
     char **tmp = NULL;
-    parsed_value = (uint8_t) strtoul(ctext, tmp, 16);
+    parsed_value = strtoul(ctext, tmp, 16);
   } else if (strcmp((const char *) print_format, APP_STR_DEC)==0) {
     char **tmp = NULL;
-    parsed_value = (uint8_t) strtoul(ctext, tmp, 10);
+    parsed_value = strtoul(ctext, tmp, 10);
   } else if (strcmp((const char *) print_format, APP_STR_OCT)==0) {
     char **tmp = NULL;
-    parsed_value = (uint8_t) strtoul(ctext, tmp, 8);
+    parsed_value = strtoul(ctext, tmp, 8);
   }
   for (int i = 0; i < APP_SWI_SIZE; i++) {
-    gboolean bit_n = (parsed_value >> i) & 0x01;
+    gboolean bit_n = (gboolean) ((parsed_value >> i) & 0x01);
     gtk_switch_set_state(GTK_SWITCH(input_swi[i]), bit_n);
   }
 }
@@ -126,9 +129,64 @@ void on_inputhex_change(GtkEditable *editable, gpointer user_data) {
 //                                              Inicialización de la GUI
 //===--------------------------------------------------------------------------------------------------------------===//
 static void activate(GtkApplication *app, gpointer user_data) {
-  // Crea una nueva ventana
   GtkWidget *window;
   window = gtk_application_window_new(app);
+
+  //===-------------------------------------------------------------------------
+  // Dialogo modal para introducir el puerto serial
+  GtkDialog *ask_serial_dialog = (GtkDialog *) gtk_dialog_new_with_buttons(
+      APP_SERIAL_DIALOG_TITLE,
+      GTK_WINDOW(window),
+      GTK_DIALOG_MODAL,
+      APP_OK,
+      GTK_RESPONSE_ACCEPT,
+      APP_CANCEL,
+      GTK_RESPONSE_REJECT,
+      NULL);
+  GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(ask_serial_dialog));
+  // Usar grid como Layout Manager
+  GtkWidget *grid_dialog;
+  grid_dialog = gtk_grid_new();
+  // Agrega el grid a la ventana del dialog
+  gtk_container_add(GTK_CONTAINER(content_area), grid_dialog);
+  // Label para el mensaje de entrada
+#ifdef _WIN32
+  GtkWidget *msg_lbl = gtk_label_new(APP_DIALOG_ASK_MSG_WIN);
+#else
+  GtkWidget *msg_lbl = gtk_label_new(APP_DIALOG_ASK_MSG_POS);
+#endif
+  gtk_grid_attach(GTK_GRID(grid_dialog), msg_lbl, 0, 0, 1, 1);
+  GtkWidget *os_port_input = gtk_entry_new();
+  gtk_grid_attach(GTK_GRID(grid_dialog), os_port_input, 0, 1, 1, 1);
+
+  // Muestra el dialogo
+  gtk_widget_show_all(GTK_WIDGET(ask_serial_dialog));
+
+  gint dialog_response = gtk_dialog_run(ask_serial_dialog);
+  if (dialog_response==GTK_RESPONSE_ACCEPT) {
+    os_port = g_string_new(gtk_entry_get_text(GTK_ENTRY(os_port_input)));
+    gboolean open_result = open_serial_port(&abstract_port, os_port);
+    if (!open_result) {
+      GtkWidget *error_open_serial = gtk_message_dialog_new(GTK_WINDOW(ask_serial_dialog),
+                                                            GTK_DIALOG_MODAL,
+                                                            GTK_MESSAGE_ERROR,
+                                                            GTK_BUTTONS_CLOSE,
+                                                            "Error al intentar abrir el puerto serial “%s”: %s",
+                                                            os_port->str,
+                                                            g_strerror(errno));
+      gtk_dialog_run(GTK_DIALOG (error_open_serial));
+      gtk_widget_destroy(error_open_serial);
+      gtk_widget_destroy(window);
+      return;
+    }
+  } else if (dialog_response==GTK_RESPONSE_REJECT || dialog_response==GTK_RESPONSE_DELETE_EVENT) {
+    // Destruye la ventana, lo que resulta en la terminación inmediata de la aplicación
+    gtk_widget_destroy(window);
+    return;
+  }
+  gtk_widget_destroy(GTK_WIDGET(ask_serial_dialog));
+
+  //===-------------------------------------------------------------------------
   gtk_window_set_title(GTK_WINDOW(window), APP_STR_MAIN_TITLE);
   // Configura el tamaño inicial de la ventana
   gtk_window_set_default_size(GTK_WINDOW(window), 100, 100);
@@ -202,9 +260,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
   // Esto dispara el handler, necesario para activar el formato correcto
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(hex_rbt), TRUE);
   g_signal_connect(hex_tbi, "activate", G_CALLBACK(on_inputhex_change), NULL);
-  //===-------------------------------------------------------------------------
 
-  // Muestra la ventana
+  // Muestra la ventana ya diseñada
   gtk_widget_show_all(window);
 }
 
@@ -212,7 +269,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 //                                                        Main
 //===--------------------------------------------------------------------------------------------------------------===//
 int main(int argc, char **argv) {
-  // Reservar memoria
+  // Reservar recursos
 
   // Crea una nueva aplicación de GTK
   GtkApplication *app;
@@ -221,13 +278,14 @@ int main(int argc, char **argv) {
   // Devuelve una nueva instancia de la App de GTK
   app = gtk_application_new(APP_ID, G_APPLICATION_FLAGS_NONE);
   // Conecta la aplicación a la señal `activate`, con el callback a la función `activate`, sin datos para pasar
-  g_signal_connect (app, "activate", G_CALLBACK(activate), NULL);
+  g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
   // Lanza la aplicación `app` de GTK, con los argumentos argc, argv y bloquea hasta que la aplicación termina
   status = g_application_run(G_APPLICATION(app), argc, argv);
   // Libera la instancia de la `app` (liberando memoria)
   g_object_unref(app);
 
-  // Libera memoria
+  // Libera recursos
+  close_serial_port(&abstract_port);
 
   // Retorna
   return status;

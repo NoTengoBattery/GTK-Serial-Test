@@ -16,3 +16,55 @@
 /// Esta es la interfaz para la biblioteca AbSerIO.
 ///
 //===--------------------------------------------------------------------------------------------------------------===//
+
+
+#include <glib.h>
+#include <stdbool.h>
+
+#ifdef _WIN32
+#else
+#include <termios.h>
+#define STD_BAUD_0                      B0
+#define STD_BAUD_50                     B50
+#define STD_BAUD_75                     B75
+#define STD_BAUD_110                    B110
+#define STD_BAUD_134                    B134
+#define STD_BAUD_150                    B150
+#define STD_BAUD_200                    B200
+#define STD_BAUD_300                    B300
+#define STD_BAUD_600                    B600
+#define STD_BAUD_1200                   B1200
+#define STD_BAUD_1800                   B1800
+#define STD_BAUD_2400                   B2400
+#define STD_BAUD_4800                   B4800
+#define STD_BAUD_9600                   B9600
+#define STD_BAUD_19200                  B19200
+#define STD_BAUD_38400                  B38400
+#define STD_BAUD_7200                   B7200
+#define STD_BAUD_14400                  B14400
+#define STD_BAUD_28800                  B28800
+#define STD_BAUD_57600                  B57600
+#define STD_BAUD_76800                  B76800
+#define STD_BAUD_115200                 B115200
+#define STD_BAUD_230400                 B230400
+#endif
+
+// Esta interfaz representa un dispositivo serial abstracto. Contiene funciones y propiedades del dispositivo serial.
+struct AbstractSerialDevice {
+  // Información interna
+  void *_internal_info;
+  // Esta función configura el baudrate
+  gboolean (*set_baud_rate)(glong baud_rate, struct AbstractSerialDevice **dev);
+};
+
+// Esta función toma un puntero a un puntero de un Abstract Serial Device, reserva memoria, abre el puerto y devuelve
+// el resultado de la operación.
+//  -> Verifica si el puntero no es null
+//  -> Reserva memoria para el driver
+//  -> Intenta abrir el puerto
+//  -> Si falla, el puerto no se abre, el puntero se vuelve NULL y retorna FALSE
+//  -> Si lo logra, llena el driver con los pertinentes
+bool open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev);
+
+// Esta función cierra un puerto serial y libera los recursos asociados.
+void close_serial_port(struct AbstractSerialDevice **dev);
