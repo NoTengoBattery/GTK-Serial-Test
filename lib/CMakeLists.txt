@@ -1,4 +1,4 @@
-#===-- src/CMakeLists.txt - Aplicación principal  -----------------------------------------------------*- CMake -*-===//
+#===-- lib/CMakeLists.txt - Bibliotecas  --------------------------------------------------------------*- CMake -*-===//
 #
 # Copyright (c) 2018 Oever González
 #
@@ -13,14 +13,12 @@
 #
 #===---------------------------------------------------------------------------------------------------------------===//
 #
-# Este sub-directorio de CMake contiene la *aplicación* principal.
+# Este directorio contiene bibliotecas que son parte abstracta del proyecto principal y se puede aislar de él.
 #
 #===---------------------------------------------------------------------------------------------------------------===//
 
-# El nombre del ejecutable
-SET ( THIS_EXE_NAME Serial )
+# AbSerIO: Abstract Serial IO
+ADD_SUBDIRECTORY ( abserio )
 
-# Agrega el ejecutable
-ADD_EXECUTABLE ( ${THIS_EXE_NAME}
-                 main.c )
-TARGET_LINK_LIBRARIES ( ${THIS_EXE_NAME} ${GTK3_STATIC_LIBRARIES} abserio )
+# Usar este directorio en los include
+INCLUDE_DIRECTORIES ( ${CMAKE_CURRENT_LIST_DIR} )

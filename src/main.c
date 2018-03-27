@@ -72,9 +72,9 @@ void print_formatted_input(void) {
   } else if (strcmp((const char *) print_format, APP_STR_HEX)==0) {
     use_format = "0x%02X";
   } else if (strcmp((const char *) print_format, APP_STR_DEC)==0) {
-    use_format = "%03d";
+    use_format = "%d";
   } else if (strcmp((const char *) print_format, APP_STR_OCT)==0) {
-    use_format = "0%03o";
+    use_format = "0%0o";
   }
   sprintf(formatted, use_format, val);
   gtk_entry_set_text(GTK_ENTRY(hex_tbi), formatted);

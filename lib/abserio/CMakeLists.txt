@@ -1,4 +1,4 @@
-#===-- src/CMakeLists.txt - Aplicación principal  -----------------------------------------------------*- CMake -*-===//
+#===-- lib/abserio/CMakeLists.txt - Biblioteca de abstracción para IO Serial  -------------------------*- CMake -*-===//
 #
 # Copyright (c) 2018 Oever González
 #
@@ -13,14 +13,25 @@
 #
 #===---------------------------------------------------------------------------------------------------------------===//
 #
-# Este sub-directorio de CMake contiene la *aplicación* principal.
+# Esta biblioteca ofrece un "driver" abstracto para puertos seriales en Windows (Win32) y macOS/Linux (POSIX).
 #
 #===---------------------------------------------------------------------------------------------------------------===//
 
-# El nombre del ejecutable
-SET ( THIS_EXE_NAME Serial )
+# El nombre la biblioteca
+SET ( THIS_LIB_NAME abserio )
+
+# Los archivos dependientes de la plataforma
+SET ( LIB_PLATFORM_SOURCES "" )
+
+IF ( WIN32 )
+  SET ( LIB_PLATFORM_SOURCES win_alloc.c )
+ELSEIF ( UNIX )
+  SET ( LIB_PLATFORM_SOURCES posix_alloc.c )
+ELSE ()
+  MESSAGE ( FATAL_ERROR "This library is supported on the following platforms: POSIX like macOS or Linux and Win32." )
+ENDIF ()
+
 
 # Agrega el ejecutable
-ADD_EXECUTABLE ( ${THIS_EXE_NAME}
-                 main.c )
-TARGET_LINK_LIBRARIES ( ${THIS_EXE_NAME} ${GTK3_STATIC_LIBRARIES} abserio )
+ADD_LIBRARY ( ${THIS_LIB_NAME} STATIC EXCLUDE_FROM_ALL ${LIB_PLATFORM_SOURCES}
+              abserio.h )
