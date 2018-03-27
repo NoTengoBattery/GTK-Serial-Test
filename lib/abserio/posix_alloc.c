@@ -24,7 +24,6 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                 Estructuras de datos
@@ -46,6 +45,8 @@ struct InternalRepresentation {
 gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
   // Obtener la información de TERMIOS
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
+  long was_ispeed = cfgetispeed(INT_INFO(*dev)->options);
+  long was_ospeed = cfgetospeed(INT_INFO(*dev)->options);
   // Configurar el baudrate
   if (cfsetispeed(INT_INFO(*dev)->options, (speed_t) baud_rate)==0) {
     if (cfsetospeed(INT_INFO(*dev)->options, (speed_t) baud_rate)==0) {
@@ -53,15 +54,16 @@ gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
       if (tcsetattr(INT_INFO(*dev)->kernel_fd, TCSANOW, INT_INFO(*dev)->options)==0) {
         return TRUE;
       }
-      return FALSE;
     }
-    return FALSE;
   }
+  cfsetispeed(INT_INFO(*dev)->options, (speed_t) was_ispeed);
+  cfsetospeed(INT_INFO(*dev)->options, (speed_t) was_ospeed);
+  tcsetattr(INT_INFO(*dev)->kernel_fd, TCSANOW, INT_INFO(*dev)->options);
   return FALSE;
 }
 
 glong get_baud_rate(struct AbstractSerialDevice **dev) {
-// Obtener la información de TERMIOS
+  // Obtener la información de TERMIOS
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
   speed_t out_speed = cfgetospeed(INT_INFO(*dev)->options);
   speed_t in_speed = cfgetospeed(INT_INFO(*dev)->options);
@@ -69,8 +71,41 @@ glong get_baud_rate(struct AbstractSerialDevice **dev) {
     return out_speed;
   }
   set_baud_rate(out_speed, dev);
-  errno = EINVAL;
   return -1;
+}
+
+gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, struct AbstractSerialDevice **dev) {
+  // Obtener la información de TERMIOS
+  tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
+  if (bit_enable) {
+    (INT_INFO(*dev)->options)->c_cflag |= PARENB;
+  } else {
+    (INT_INFO(*dev)->options)->c_cflag &= ~PARENB;
+  }
+  if (tcsetattr(INT_INFO(*dev)->kernel_fd, TCSANOW, INT_INFO(*dev)->options)==0) {
+    tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
+    if (odd_neven==PARITY_ODD) {
+      (INT_INFO(*dev)->options)->c_cflag |= PARODD;
+    } else {
+      (INT_INFO(*dev)->options)->c_cflag &= ~PARODD;
+    }
+    if (tcsetattr(INT_INFO(*dev)->kernel_fd, TCSANOW, INT_INFO(*dev)->options)==0) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+gboolean get_parity_bit(struct AbstractSerialDevice **dev) {
+  // Obtener la información de TERMIOS
+  tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
+  return (gboolean) ((INT_INFO(*dev)->options)->c_cflag & PARENB);
+}
+
+gboolean get_parity_odd_neven(struct AbstractSerialDevice **dev) {
+  // Obtener la información de TERMIOS
+  tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
+  return (gboolean) ((INT_INFO(*dev)->options)->c_cflag & PARODD);
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -114,6 +149,9 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
     // Configura las funciones del driver
     (*dev)->set_baud_rate = set_baud_rate;
     (*dev)->get_baud_rate = get_baud_rate;
+    (*dev)->set_parity_bit = set_parity_bit;
+    (*dev)->get_parity_bit = get_parity_bit;
+    (*dev)->get_parity_odd_neven = get_parity_odd_neven;
 
     return TRUE;
   }

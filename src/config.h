@@ -40,5 +40,9 @@
 #define APP_CANCEL                      "Cancelar"
 #define APP_DIALOG_ASK_MSG_WIN          "Ingrese el número del puerto COM:"
 #define APP_DIALOG_ASK_MSG_POS          "Ingrese la ruta hacia el archivo del puerto:"
+#define APP_DIALOG_BAUD_RATE            "Baud rate: \t"
+#define APP_DIALOG_PARITY_ENABLE        "Bit de pariedad: \t"
+#define APP_DIALOG_PARITY_ODD           "Bit par/!impar: \t"
+
 
 #endif // CONFIG_H

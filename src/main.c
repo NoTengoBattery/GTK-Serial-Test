@@ -146,9 +146,59 @@ void setup_port_diag(GtkButton *button, GtkWindow *window) {
   // Agrega el grid a la ventana del dialog
   gtk_container_add(GTK_CONTAINER(content_area), grid_dialog);
   gtk_widget_show_all(GTK_WIDGET(content_area));
+  // Combo box para los bauds
+  GtkWidget *combo_bauds = gtk_combo_box_text_new();
+  for (int j = 0; j < BAUDS_AVAIL; j++) {
+    long curr_baud = bauds[j];
+    if (curr_baud==0) {
+      break;
+    }
+    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(combo_bauds),
+                              g_strdup_printf("%lu", curr_baud),
+                              g_strdup_printf("%lu", curr_baud));
+  }
+  gtk_grid_attach(GTK_GRID(grid_dialog), gtk_label_new(APP_DIALOG_BAUD_RATE), 0, 0, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid_dialog), combo_bauds, 1, 0, 1, 1);
+  gtk_combo_box_set_active_id(GTK_COMBO_BOX(combo_bauds),
+                              g_strdup_printf("%lu", abstract_port->get_baud_rate(&abstract_port)));
+  // Switch para el parity bit
+  GtkWidget *switch_parity_enable = gtk_switch_new();
+  GtkWidget *switch_parity_odd = gtk_switch_new();
+  gtk_switch_set_state(GTK_SWITCH(switch_parity_enable), abstract_port->get_parity_bit(&abstract_port));
+  gtk_switch_set_state(GTK_SWITCH(switch_parity_odd), abstract_port->get_parity_odd_neven(&abstract_port));
+  gtk_grid_attach(GTK_GRID(grid_dialog), gtk_label_new(APP_DIALOG_PARITY_ENABLE), 0, 1, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid_dialog), switch_parity_enable, 1, 1, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid_dialog), gtk_label_new(APP_DIALOG_PARITY_ODD), 0, 2, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid_dialog), switch_parity_odd, 1, 2, 1, 1);
+
+  // Muestra y ejecuta el diálogo
+  gtk_widget_show_all(GTK_WIDGET(content_area));
   gint dialog_response = gtk_dialog_run(setup_port_dialog);
+  char *str2p = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo_bauds));
+  gboolean parity_enable_boolean_switch = gtk_switch_get_state(GTK_SWITCH(switch_parity_enable));
+  gboolean parity_odd_boolean_switch = gtk_switch_get_state(GTK_SWITCH(switch_parity_odd));
   switch (dialog_response) {
     case GTK_RESPONSE_ACCEPT://
+      errno = 0x00;
+      // Configurar el puerto
+      if (str2p!=NULL) {
+        abstract_port->set_baud_rate((glong) strtoull(str2p, NULL, 10), &abstract_port);
+        if (errno!=0) goto on_errno_not_zero_setup_port;
+      }
+      abstract_port->set_parity_bit(parity_enable_boolean_switch, parity_odd_boolean_switch, &abstract_port);
+      if (errno!=0) goto on_errno_not_zero_setup_port;
+    on_errno_not_zero_setup_port:
+      if (errno!=0x00) {
+        GtkWidget *error_chg_serial = gtk_message_dialog_new(GTK_WINDOW(setup_port_dialog),
+                                                             GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                                                             GTK_MESSAGE_ERROR,
+                                                             GTK_BUTTONS_CLOSE,
+                                                             "No se han cambiado las configuraciones de “%s”: %s",
+                                                             os_port->str,
+                                                             g_strerror(errno));
+        gtk_dialog_run(GTK_DIALOG(error_chg_serial));
+        gtk_widget_destroy(GTK_WIDGET(error_chg_serial));
+      }
       break;
     case GTK_RESPONSE_REJECT://
       break;

@@ -44,7 +44,8 @@ SET ( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GLIB_LDFLAGS_LD}" )
 
 # Agrega el ejecutable
 ADD_LIBRARY ( ${THIS_LIB_NAME} STATIC EXCLUDE_FROM_ALL ${LIB_PLATFORM_SOURCES}
-              abserio.h )
+              abserio.h
+              const.c )
 
 # Agrega los encabezados y las bibliotecas de glib
 TARGET_INCLUDE_DIRECTORIES ( ${THIS_LIB_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} )
