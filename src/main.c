@@ -11,16 +11,29 @@
 //  an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 //                    specific language governing permissions and limitations under the License.
 //
-//===---------------------------------------------------------------------------------------------------------------===//
+//===--------------------------------------------------------------------------------------------------------------===//
 ///
 /// Contiene la GUI principal de GTK.
 ///
-//===---------------------------------------------------------------------------------------------------------------===//
+//===--------------------------------------------------------------------------------------------------------------===//
 
 #include "config.h"
 #include <gtk/gtk.h>
-#include <stdint.h>
 #include <memory.h>
+#include <regex.h>
+#include <stdatomic.h>
+#include <stdlib.h>
+#ifdef _WIN32
+#include <stdint.h>
+#endif
+
+//===--------------------------------------------------------------------------------------------------------------===//
+//                                                 Estructuras de datos
+//===--------------------------------------------------------------------------------------------------------------===//
+
+//===--------------------------------------------------------------------------------------------------------------===//
+//                                                      Globales
+//===--------------------------------------------------------------------------------------------------------------===//
 
 GtkWidget *input_swi[APP_SWI_SIZE];
 GtkWidget *output_swo[APP_SWO_SIZE];
@@ -29,12 +42,14 @@ GtkWidget *hex_tbo;
 GtkWidget *send_bto;
 GSList *format_rbg;
 volatile char *print_format;
+regex_t charmask_pattern;
+int charmask_pattern_rc;
 
-// Callbacks para los eventos de la GUI
-gboolean on_switch_change(GtkSwitch *swi, gboolean state) {
-  // Vamos a cambiar el valor directamente aquí porque el "default handler" se llama cuando esta función retorna.
-  // Es decir, el botón mantiene su valor anterior durante esta función (es por eso que hace falta el segundo parametro)
-  gtk_switch_set_state(swi, state);
+//===--------------------------------------------------------------------------------------------------------------===//
+//                                                   Funciones extra
+//===--------------------------------------------------------------------------------------------------------------===//
+void print_formatted_input(void) {
+  // Obtiene el valor binario a partir de lo switches
   uint8_t val = 0x00;
   for (int i = 0; i < APP_SWI_SIZE; i++) {
     uint8_t binval = (uint8_t) gtk_switch_get_state(GTK_SWITCH(input_swi[i]));
@@ -59,19 +74,61 @@ gboolean on_switch_change(GtkSwitch *swi, gboolean state) {
     }
   } else if (strcmp((const char *) print_format, APP_STR_HEX)==0) {
     use_format = "0x%02X";
+  } else if (strcmp((const char *) print_format, APP_STR_DEC)==0) {
+    use_format = "%03d";
+  } else if (strcmp((const char *) print_format, APP_STR_OCT)==0) {
+    use_format = "0%03o";
   }
   sprintf(formatted, use_format, val);
   gtk_entry_set_text(GTK_ENTRY(hex_tbi), formatted);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+//                                        Callbacks para los eventos de la GUI
+//===--------------------------------------------------------------------------------------------------------------===//
+gboolean on_switch_change(GtkSwitch *swi, gboolean state) {
+  // Vamos a cambiar el valor directamente aquí porque el "default handler" se llama cuando esta función retorna.
+  // Es decir, el botón mantiene su valor anterior durante esta función (es por eso que hace falta el segundo parametro)
+  gtk_switch_set_state(swi, state);
+  print_formatted_input();
   return FALSE;
 }
 
-void
-on_radiobtn_change(GtkToggleButton *togglebutton, gpointer user_data) {
+void on_radiobtn_change(GtkToggleButton *togglebutton, gpointer user_data) {
   if (gtk_toggle_button_get_active(togglebutton)) {
-    print_format = (volatile char *) gtk_button_get_label((GtkButton *) togglebutton);
+    print_format = (volatile char *) gtk_button_get_label(GTK_BUTTON(togglebutton));
+    // Actualizar el valor al nuevo formato
+    print_formatted_input();
   }
 }
 
+void on_inputhex_change(GtkEditable *editable, gpointer user_data) {
+  const char *ctext = gtk_entry_get_text(GTK_ENTRY(editable));
+  uint8_t parsed_value = 0x00;
+  if (strcmp((const char *) print_format, APP_STR_ASCII)==0) {
+    charmask_pattern_rc = regexec(&charmask_pattern, ctext, 0, NULL, 0);
+    if (!charmask_pattern_rc) {
+      parsed_value = (uint8_t) *(ctext + 1);
+    }
+  } else if (strcmp((const char *) print_format, APP_STR_HEX)==0) {
+    char **tmp = NULL;
+    parsed_value = (uint8_t) strtoul(ctext, tmp, 16);
+  } else if (strcmp((const char *) print_format, APP_STR_DEC)==0) {
+    char **tmp = NULL;
+    parsed_value = (uint8_t) strtoul(ctext, tmp, 10);
+  } else if (strcmp((const char *) print_format, APP_STR_OCT)==0) {
+    char **tmp = NULL;
+    parsed_value = (uint8_t) strtoul(ctext, tmp, 8);
+  }
+  for (int i = 0; i < APP_SWI_SIZE; i++) {
+    gboolean bit_n = (parsed_value >> i) & 0x01;
+    gtk_switch_set_state(GTK_SWITCH(input_swi[i]), bit_n);
+  }
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+//                                              Inicialización de la GUI
+//===--------------------------------------------------------------------------------------------------------------===//
 static void activate(GtkApplication *app, gpointer user_data) {
   // Crea una nueva ventana
   GtkWidget *window;
@@ -132,10 +189,9 @@ static void activate(GtkApplication *app, gpointer user_data) {
   gtk_grid_attach(GTK_GRID(grid), dec_rbt, 4, 2, 1, 1);
   GtkWidget *oct_rbt = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(ascii_rbt), APP_STR_OCT);
   gtk_grid_attach(GTK_GRID(grid), oct_rbt, 4, 3, 1, 1);
-  GtkWidget *bin_rbt = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(ascii_rbt), APP_STR_BIN);
-  gtk_grid_attach(GTK_GRID(grid), bin_rbt, 4, 4, 1, 1);
   format_rbg = gtk_radio_button_get_group(GTK_RADIO_BUTTON(ascii_rbt));
 
+  //===-------------------------------------------------------------------------
   // Agrega los callback
   //    -> Callback para los switch de entrada
   for (int i = 0; i < APP_SWI_SIZE; i++) {
@@ -147,13 +203,27 @@ static void activate(GtkApplication *app, gpointer user_data) {
     format_rbg = format_rbg->next;
     g_signal_connect(w, "toggled", G_CALLBACK(on_radiobtn_change), NULL);
   }
+  // Esto dispara el handler, necesario para activar el formato correcto
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(hex_rbt), TRUE);
+  g_signal_connect(hex_tbi, "activate", G_CALLBACK(on_inputhex_change), NULL);
+  //===-------------------------------------------------------------------------
 
   // Muestra la ventana
   gtk_widget_show_all(window);
 }
 
+//===--------------------------------------------------------------------------------------------------------------===//
+//                                                        Main
+//===--------------------------------------------------------------------------------------------------------------===//
 int main(int argc, char **argv) {
+  // Reservar memoria
+  //    -> Compilar la regex
+  charmask_pattern_rc = regcomp(&charmask_pattern, "\'.\'", 0);
+  if (charmask_pattern_rc) {
+    fprintf(stderr, "No se ha podido compilar la regex.\n");
+    exit(1);
+  }
+
   // Crea una nueva aplicación de GTK
   GtkApplication *app;
   // Esta variable almacena el estado de retorno de la aplicación
@@ -166,6 +236,10 @@ int main(int argc, char **argv) {
   status = g_application_run(G_APPLICATION(app), argc, argv);
   // Libera la instancia de la `app` (liberando memoria)
   g_object_unref(app);
+
+  // Libera memoria
+  regfree(&charmask_pattern);
+
   // Retorna
   return status;
 }
