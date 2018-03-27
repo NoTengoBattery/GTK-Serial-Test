@@ -73,6 +73,10 @@ struct AbstractSerialDevice {
   gboolean (*get_parity_bit)(struct AbstractSerialDevice **dev);
   // Devuelve TRUE mientras el bit de pariedad sea impar
   gboolean (*get_parity_odd_neven)(struct AbstractSerialDevice **dev);
+  // Activa o desactiva el control por software del flujo de entrada/salida
+  gboolean (*set_software_control_flow)(gboolean bit_enable, struct AbstractSerialDevice **dev);
+  // Devuelve el estado del bit de control por software
+  gboolean (*get_software_control_flow)(struct AbstractSerialDevice **dev);
 };
 
 // Esta función toma un puntero a un puntero de un Abstract Serial Device, reserva memoria, abre el puerto y devuelve

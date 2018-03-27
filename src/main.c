@@ -171,12 +171,19 @@ void setup_port_diag(GtkButton *button, GtkWindow *window) {
   gtk_grid_attach(GTK_GRID(grid_dialog), gtk_label_new(APP_DIALOG_PARITY_ODD), 0, 2, 1, 1);
   gtk_grid_attach(GTK_GRID(grid_dialog), switch_parity_odd, 1, 2, 1, 1);
 
+  // Switch para el control por software
+  GtkWidget *switch_swofl_enable = gtk_switch_new();
+  gtk_switch_set_state(GTK_SWITCH(switch_swofl_enable), abstract_port->get_software_control_flow(&abstract_port));
+  gtk_grid_attach(GTK_GRID(grid_dialog), gtk_label_new(APP_DIALOG_SWCTL), 0, 3, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid_dialog), switch_swofl_enable, 1, 3, 1, 1);
+
   // Muestra y ejecuta el diálogo
   gtk_widget_show_all(GTK_WIDGET(content_area));
   gint dialog_response = gtk_dialog_run(setup_port_dialog);
   char *str2p = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo_bauds));
   gboolean parity_enable_boolean_switch = gtk_switch_get_state(GTK_SWITCH(switch_parity_enable));
   gboolean parity_odd_boolean_switch = gtk_switch_get_state(GTK_SWITCH(switch_parity_odd));
+  gboolean switch_swofl_boolean_switch = gtk_switch_get_state(GTK_SWITCH(switch_swofl_enable));
   switch (dialog_response) {
     case GTK_RESPONSE_ACCEPT://
       errno = 0x00;
@@ -186,6 +193,8 @@ void setup_port_diag(GtkButton *button, GtkWindow *window) {
         if (errno!=0) goto on_errno_not_zero_setup_port;
       }
       abstract_port->set_parity_bit(parity_enable_boolean_switch, parity_odd_boolean_switch, &abstract_port);
+      if (errno!=0) goto on_errno_not_zero_setup_port;
+      abstract_port->set_software_control_flow(switch_swofl_boolean_switch, &abstract_port);
       if (errno!=0) goto on_errno_not_zero_setup_port;
     on_errno_not_zero_setup_port:
       if (errno!=0x00) {
