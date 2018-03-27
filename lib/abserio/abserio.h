@@ -19,7 +19,6 @@
 
 
 #include <glib.h>
-#include <stdbool.h>
 
 #ifdef _WIN32
 #else
@@ -55,6 +54,8 @@ struct AbstractSerialDevice {
   void *_internal_info;
   // Esta función configura el baudrate
   gboolean (*set_baud_rate)(glong baud_rate, struct AbstractSerialDevice **dev);
+  // Esta función devuelve el baudrate actual
+  glong (*get_baud_rate)(struct AbstractSerialDevice **dev);
 };
 
 // Esta función toma un puntero a un puntero de un Abstract Serial Device, reserva memoria, abre el puerto y devuelve
@@ -64,7 +65,7 @@ struct AbstractSerialDevice {
 //  -> Intenta abrir el puerto
 //  -> Si falla, el puerto no se abre, el puntero se vuelve NULL y retorna FALSE
 //  -> Si lo logra, llena el driver con los pertinentes
-bool open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev);
+gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev);
 
 // Esta función cierra un puerto serial y libera los recursos asociados.
 void close_serial_port(struct AbstractSerialDevice **dev);

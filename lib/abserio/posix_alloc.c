@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                 Estructuras de datos
@@ -42,8 +43,6 @@ struct InternalRepresentation {
 //                                           Implementación de la interfaz
 //===--------------------------------------------------------------------------------------------------------------===//
 
-
-
 gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
   // Obtener la información de TERMIOS
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -61,6 +60,19 @@ gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
   return FALSE;
 }
 
+glong get_baud_rate(struct AbstractSerialDevice **dev) {
+// Obtener la información de TERMIOS
+  tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
+  speed_t out_speed = cfgetospeed(INT_INFO(*dev)->options);
+  speed_t in_speed = cfgetospeed(INT_INFO(*dev)->options);
+  if (out_speed==in_speed) {
+    return out_speed;
+  }
+  set_baud_rate(out_speed, dev);
+  errno = EINVAL;
+  return -1;
+}
+
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                          Funciones de control del puerto
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -72,7 +84,7 @@ void free_sources(struct AbstractSerialDevice **dev) {
   *dev = NULL;
 }
 
-bool open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
+gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
   if (dev==NULL || *dev!=NULL) {
     // Si no es NULL, podemos estar cayendo encima de un driver reservado que ya no se podrá liberar.
     return FALSE;
@@ -86,7 +98,7 @@ bool open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
     int k_fd = open(os_dev->str, O_RDWR | O_NOCTTY | O_NDELAY);
     if (k_fd==-1) {
       free_sources(dev);
-      return false;
+      return FALSE;
     }
     // Resetear todas las banderas para este archivo
     fcntl(k_fd, F_SETFL, 0);
@@ -101,10 +113,11 @@ bool open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
 
     // Configura las funciones del driver
     (*dev)->set_baud_rate = set_baud_rate;
+    (*dev)->get_baud_rate = get_baud_rate;
 
     return TRUE;
   }
-  return false;
+  return FALSE;
 }
 
 void close_serial_port(struct AbstractSerialDevice **dev) {

@@ -39,8 +39,6 @@ GtkWidget *input_swi[APP_SWI_SIZE];
 GtkWidget *output_swo[APP_SWO_SIZE];
 GtkWidget *hex_tbi;
 GtkWidget *hex_tbo;
-GtkWidget *send_bto;
-GSList *format_rbg;
 volatile char *print_format;
 struct AbstractSerialDevice *abstract_port;
 GString *os_port;
@@ -63,13 +61,17 @@ void print_formatted_input(void) {
     // Usar el valor decimal con un \ para los valores de 0 a 31.
     // De 31 a 254, usar el valor ASCII normal
     switch (val) {
-      case 0 ... 31:use_format = "\'\\%02d\'";
+      case 0 ... 31://
+        use_format = "\'\\%02d\'";
         break;
-      case 0x7F:use_format = "\'\\DEL\'";
+      case 0x7F://
+        use_format = "\'\\DEL\'";
         break;
-      case 0x80 ... 0xFF:use_format = "\'\\-%02d\'";
+      case 0x80 ... 0xFF://
+        use_format = "\'\\-%02d\'";
         break;
-      default:use_format = "\'%c\'";
+      default://
+        use_format = "\'%c\'";
         break;
     }
   } else if (strcmp((const char *) print_format, APP_STR_HEX)==0) {
@@ -125,6 +127,38 @@ void on_inputhex_change(GtkEditable *editable, gpointer user_data) {
   }
 }
 
+void setup_port_diag(GtkButton *button, GtkWindow *window) {
+  char formatted[100];
+  sprintf(formatted, APP_SETUP_SR_DIALOG_TITLE, os_port->str);
+  GtkDialog *setup_port_dialog = (GtkDialog *) gtk_dialog_new_with_buttons(
+      formatted,
+      GTK_WINDOW(window),
+      GTK_DIALOG_MODAL,
+      APP_OK,
+      GTK_RESPONSE_ACCEPT,
+      APP_CANCEL,
+      GTK_RESPONSE_REJECT,
+      NULL);
+  GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(setup_port_dialog));
+  // Usar grid como Layout Manager
+  GtkWidget *grid_dialog;
+  grid_dialog = gtk_grid_new();
+  // Agrega el grid a la ventana del dialog
+  gtk_container_add(GTK_CONTAINER(content_area), grid_dialog);
+  gtk_widget_show_all(GTK_WIDGET(content_area));
+  gint dialog_response = gtk_dialog_run(setup_port_dialog);
+  switch (dialog_response) {
+    case GTK_RESPONSE_ACCEPT://
+      break;
+    case GTK_RESPONSE_REJECT://
+      break;
+    default:break;
+  }
+
+  // Destruir hasta que termine de usarlo
+  gtk_widget_destroy(GTK_WIDGET(setup_port_dialog));
+}
+
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                              Inicialización de la GUI
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -137,7 +171,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
   GtkDialog *ask_serial_dialog = (GtkDialog *) gtk_dialog_new_with_buttons(
       APP_SERIAL_DIALOG_TITLE,
       GTK_WINDOW(window),
-      GTK_DIALOG_MODAL,
+      GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
       APP_OK,
       GTK_RESPONSE_ACCEPT,
       APP_CANCEL,
@@ -160,7 +194,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
   gtk_grid_attach(GTK_GRID(grid_dialog), os_port_input, 0, 1, 1, 1);
 
   // Muestra el dialogo
-  gtk_widget_show_all(GTK_WIDGET(ask_serial_dialog));
+  gtk_widget_show_all(GTK_WIDGET(content_area));
 
   gint dialog_response = gtk_dialog_run(ask_serial_dialog);
   if (dialog_response==GTK_RESPONSE_ACCEPT) {
@@ -168,14 +202,13 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gboolean open_result = open_serial_port(&abstract_port, os_port);
     if (!open_result) {
       GtkWidget *error_open_serial = gtk_message_dialog_new(GTK_WINDOW(ask_serial_dialog),
-                                                            GTK_DIALOG_MODAL,
+                                                            GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
                                                             GTK_MESSAGE_ERROR,
                                                             GTK_BUTTONS_CLOSE,
                                                             "Error al intentar abrir el puerto serial “%s”: %s",
                                                             os_port->str,
                                                             g_strerror(errno));
       gtk_dialog_run(GTK_DIALOG (error_open_serial));
-      gtk_widget_destroy(error_open_serial);
       gtk_widget_destroy(window);
       return;
     }
@@ -188,8 +221,6 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
   //===-------------------------------------------------------------------------
   gtk_window_set_title(GTK_WINDOW(window), APP_STR_MAIN_TITLE);
-  // Configura el tamaño inicial de la ventana
-  gtk_window_set_default_size(GTK_WINDOW(window), 100, 100);
 
   // Usar grid como Layout Manager
   GtkWidget *grid;
@@ -230,7 +261,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
   gtk_entry_set_text(GTK_ENTRY(hex_tbo), APP_HEX_ZERO);
   gtk_grid_attach(GTK_GRID(grid), hex_tbo, 2, APP_SWO_SIZE, 2, 1);
   gtk_widget_set_sensitive(GTK_WIDGET(hex_tbo), FALSE); // deshabilita este textbox
-  send_bto = gtk_button_new();
+  GtkWidget *send_bto = gtk_button_new();
   gtk_grid_attach(GTK_GRID(grid), send_bto, 0, APP_SWO_SIZE + 1, 4, 1);
   gtk_button_set_label(GTK_BUTTON(send_bto), APP_STR_SEND_BYTE);
 
@@ -243,7 +274,13 @@ static void activate(GtkApplication *app, gpointer user_data) {
   gtk_grid_attach(GTK_GRID(grid), dec_rbt, 4, 2, 1, 1);
   GtkWidget *oct_rbt = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(ascii_rbt), APP_STR_OCT);
   gtk_grid_attach(GTK_GRID(grid), oct_rbt, 4, 3, 1, 1);
-  format_rbg = gtk_radio_button_get_group(GTK_RADIO_BUTTON(ascii_rbt));
+  GSList *format_rbg = gtk_radio_button_get_group(GTK_RADIO_BUTTON(ascii_rbt));
+
+  // Botón para configurar el puerto
+  GtkWidget *setup_port = gtk_button_new();
+  gtk_grid_attach(GTK_GRID(grid), setup_port, 4, 4, 1, 1);
+  gtk_button_set_label(GTK_BUTTON(setup_port), APP_STR_SETUP_PORT);
+
 
   //===-------------------------------------------------------------------------
   // Agrega los callback
@@ -259,7 +296,10 @@ static void activate(GtkApplication *app, gpointer user_data) {
   }
   // Esto dispara el handler, necesario para activar el formato correcto
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(hex_rbt), TRUE);
+  // Conecta a la señal que se produce al dar enter en el text box
   g_signal_connect(hex_tbi, "activate", G_CALLBACK(on_inputhex_change), NULL);
+  // Conecta al botón para mostrar el menú de configuración
+  g_signal_connect(setup_port, "clicked", G_CALLBACK(setup_port_diag), window);
 
   // Muestra la ventana ya diseñada
   gtk_widget_show_all(window);
