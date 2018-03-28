@@ -20,7 +20,7 @@
 ///
 //===--------------------------------------------------------------------------------------------------------------===//
 
-#define G_LOG_DOMAIN                    "PosixDriver"
+#define G_LOG_DOMAIN                    "PosixAbSerIO"
 #include "abserio.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -263,7 +263,6 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
     g_mutex_init(ACCESS_LOCK);
     g_mutex_init(READ_LOCK);
     g_mutex_init(WRITE_LOCK);
-    INT_INFO(*dev)->open = TRUE;
 
     int k_fd = open(os_dev->str, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (k_fd==-1) {
@@ -271,6 +270,7 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
       return FALSE;
     }
     g_mutex_lock(ACCESS_LOCK);
+    INT_INFO(*dev)->open = TRUE;
     // Guardar el FD en la IR
     INT_INFO(*dev)->kernel_fd = k_fd;
     // Obtener la información de TERMIOS

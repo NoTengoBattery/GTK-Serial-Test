@@ -22,8 +22,9 @@
 //===--------------------------------------------------------------------------------------------------------------===//
 
 
-#define G_LOG_DOMAIN                    "WindowsDriver"
+#define G_LOG_DOMAIN                    "Win32AbSerIO"
 #include "abserio.h"
+#include <errno.h>
 #include <stdatomic.h>
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -45,20 +46,35 @@ struct InternalRepresentation {
 #define READ_LOCK                       &INT_INFO(*dev)->read_lock
 #define WRITE_LOCK                      &INT_INFO(*dev)->write_lock
 #define ACCESS_LOCK                     &INT_INFO(*dev)->access_lock
+#define PRINT_ERRNO(x)                  x("Message: \'%s\'", g_strerror(errno))
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                           Implementación de la interfaz
 //===--------------------------------------------------------------------------------------------------------------===//
 gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
   g_mutex_lock(ACCESS_LOCK);
+  long was_ospeed;
   if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    was_ospeed = (INT_INFO(*dev)->params)->BaudRate;
     (INT_INFO(*dev)->params)->BaudRate = (DWORD) baud_rate;
     gboolean eval = SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
     errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    if (!eval) {
+      g_critical("Unable to change baud rate to \'%lu\'. Restoring the original baud rate (%lu).",
+                 baud_rate,
+                 was_ospeed);
+      PRINT_ERRNO(g_critical);
+      (INT_INFO(*dev)->params)->BaudRate = (DWORD) was_ospeed;
+      SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
+      g_mutex_unlock(ACCESS_LOCK);
+      return FALSE;
+    }
     g_mutex_unlock(ACCESS_LOCK);
-    return eval;
+    return TRUE;
   }
   errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+  g_critical("Unable to read port information.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -71,6 +87,8 @@ glong get_baud_rate(struct AbstractSerialDevice **dev) {
     return (INT_INFO(*dev)->params)->BaudRate;
   }
   errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+  g_critical("Unable to read port information.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return -1;
 }
@@ -79,13 +97,21 @@ gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, struct Abstract
   g_mutex_lock(ACCESS_LOCK);
   if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
     (INT_INFO(*dev)->params)->fParity = (DWORD) bit_enable;
-    (INT_INFO(*dev)->params)->Parity = (BYTE)(bit_enable ? (BYTE)(odd_neven ? ODDPARITY : EVENPARITY) : NOPARITY);
+    (INT_INFO(*dev)->params)->Parity = (BYTE) (bit_enable ? (BYTE) (odd_neven ? ODDPARITY : EVENPARITY) : NOPARITY);
     gboolean eval = SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
     errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    if (!eval) {
+      g_critical("Unable to set parity bits configuration. Won't restore original.");
+      PRINT_ERRNO(g_critical);
+      g_mutex_unlock(ACCESS_LOCK);
+      return FALSE;
+    }
     g_mutex_unlock(ACCESS_LOCK);
-    return eval;
+    return TRUE;
   }
   errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+  g_critical("Unable to read port information.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -98,6 +124,8 @@ gboolean get_parity_bit(struct AbstractSerialDevice **dev) {
     return (gboolean) (INT_INFO(*dev)->params)->fParity;
   }
   errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+  g_critical("Unable to read port information.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -110,6 +138,8 @@ gboolean get_parity_odd_neven(struct AbstractSerialDevice **dev) {
     return (INT_INFO(*dev)->params)->Parity==ODDPARITY ? TRUE : FALSE;
   }
   errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+  g_critical("Unable to read port information.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -126,10 +156,18 @@ gboolean set_software_control_flow(gboolean bit_enable, struct AbstractSerialDev
     }
     gboolean eval = SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
     errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    if (!eval) {
+      g_critical("Unable to set software control configuration. Won't restore original.");
+      PRINT_ERRNO(g_critical);
+      g_mutex_unlock(ACCESS_LOCK);
+      return FALSE;
+    }
     g_mutex_unlock(ACCESS_LOCK);
-    return eval;
+    return TRUE;
   }
   errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+  g_critical("Unable to read port information.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -142,6 +180,8 @@ gboolean get_software_control_flow(struct AbstractSerialDevice **dev) {
     return (gboolean) (INT_INFO(*dev)->params)->fInX;
   }
   errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+  g_critical("Unable to read port information.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -151,7 +191,7 @@ gboolean write_byte(gchar byte, struct AbstractSerialDevice **dev) {
   DWORD n;
   if (isReading) {
     g_mutex_lock(WRITE_LOCK);
-    g_debug("%s: Performing \'write\' operation while a \'read\' operation is running.", "WIN_ALLOC");
+    g_debug("Performing \'write\' operation while a \'read\' operation is running.");
     WriteFile(INT_INFO(*dev)->k_com, &byte, 1, &n, NULL);
     g_mutex_unlock(WRITE_LOCK);
   } else {
@@ -164,7 +204,12 @@ gboolean write_byte(gchar byte, struct AbstractSerialDevice **dev) {
     g_mutex_unlock(WRITE_LOCK);
     g_mutex_unlock(ACCESS_LOCK);
   }
-  return n==1 ? TRUE : FALSE;
+  if (n==1) {
+    return TRUE;
+  }
+  g_critical("Returning with an invalid number of bytes sent. Expected %d, sent %d", 1, (int) n);
+  PRINT_ERRNO(g_critical);
+  return FALSE;
 }
 
 char read_byte(struct AbstractSerialDevice **dev) {
@@ -172,14 +217,14 @@ char read_byte(struct AbstractSerialDevice **dev) {
   gchar readed;
   do {
     if (*dev==NULL) {
-      g_debug("%s: Read operation cancelled: resource not available.", "WIN_ALLOC");
+      g_debug("Read operation cancelled: resource not available.");
       errno = ECANCELED;
       return -1;
     }
     g_mutex_lock(ACCESS_LOCK);
     if (INT_INFO(*dev)->open==FALSE) {
       g_mutex_unlock(ACCESS_LOCK);
-      g_debug("%s: Read operation cancelled: file handler reported as \'closed\'.", "WIN_ALLOC");
+      g_debug("Read operation cancelled: file HANDLE is closed.");
       errno = ECANCELED;
       return -1;
     }
@@ -190,7 +235,7 @@ char read_byte(struct AbstractSerialDevice **dev) {
     g_mutex_unlock(ACCESS_LOCK);
     g_thread_yield();
   } while (n!=1);
-  g_debug("%s: Returning from blocking-read, with a read value of '%d'.", "WIN_ALLOC-READ", readed);
+  g_debug("Returning from blocking-read, read '%d' from port.", readed);
   return readed;
 }
 
@@ -201,16 +246,19 @@ void free_sources(struct AbstractSerialDevice **dev) {
   g_mutex_clear(ACCESS_LOCK);
   g_mutex_clear(READ_LOCK);
   g_mutex_clear(WRITE_LOCK);
+  g_debug("Freeing driver resources for HANDLE %d.", INT_INFO(*dev)->k_com);
   free(INT_INFO(*dev)->params);
   free(INT_INFO(*dev)->tout);
   free(INT_INFO(*dev));
   free(*dev);
+  g_debug("Driver deallocate: setting driver pointer to NULL.");
   *dev = NULL;
 }
 
 gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
   if (dev==NULL || *dev!=NULL) {
     // Si no es NULL, podemos estar cayendo encima de un driver reservado que ya no se podrá liberar.
+    g_error("Trying to allocate a driver in a pointer which is not NULL. This is considered a bug.");
     return FALSE;
   }
   if (os_dev!=NULL && os_dev->str!=NULL) {
@@ -223,7 +271,6 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
     g_mutex_init(ACCESS_LOCK);
     g_mutex_init(READ_LOCK);
     g_mutex_init(WRITE_LOCK);
-    INT_INFO(*dev)->open = TRUE;
 
     // Intentar abrir el puerto directamente. p.e. COM1
     HANDLE k_hd = CreateFile(os_dev->str,
@@ -243,9 +290,11 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
                         OPEN_EXISTING,
                         0,
                         NULL);
+      errno = EINVAL;
       if (k_hd==INVALID_HANDLE_VALUE) {
         // No se puede abrir el puerto COM
-        _set_errno((int) GetLastError());
+        g_critical("Unable to open the COM file.");
+        g_critical("Message from Windows: \'%s\'", g_strerror((int) GetLastError()));
         free_sources(dev);
         return FALSE;
       }
@@ -256,6 +305,7 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
     g_mutex_lock(ACCESS_LOCK);
     (INT_INFO(*dev)->params)->DCBlength = sizeof(DCB);
     if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+      INT_INFO(*dev)->open = TRUE;
       // Configura las funciones del driver
       (*dev)->set_baud_rate = set_baud_rate;
       (*dev)->get_baud_rate = get_baud_rate;
@@ -280,14 +330,20 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
       (INT_INFO(*dev)->tout)->ReadTotalTimeoutConstant = (1000/60);
       SetCommTimeouts(INT_INFO(*dev)->k_com, INT_INFO(*dev)->tout);
       GetCommTimeouts(INT_INFO(*dev)->k_com, INT_INFO(*dev)->tout);
+      g_debug("Driver polling timeout: %.6f.",
+              ((INT_INFO(*dev)->tout)->ReadTotalTimeoutConstant)/1000.0);
 
       g_mutex_unlock(ACCESS_LOCK);
-      g_debug("%s: Successfully created a driver for the file \'%s\'.", "WIN_ALLOC", os_dev->str);
+      g_debug("Successfully created a driver for the file \'%s\' (HANDLE: %d).",
+              os_dev->str,
+              INT_INFO(*dev)->k_com);
       return TRUE;
     }
     // No se puede obtener información del puerto COM
     g_mutex_unlock(ACCESS_LOCK);
-    _set_errno((int) GetLastError());
+    errno = EINVAL;
+    g_critical("Unable to read portinformation.");
+    PRINT_ERRNO(g_critical);
     free_sources(dev);
     return FALSE;
   }
@@ -299,10 +355,13 @@ void close_serial_port(struct AbstractSerialDevice **dev) {
     INT_INFO(*dev)->open = FALSE;
     CloseHandle(INT_INFO(*dev)->k_com);
     g_mutex_unlock(ACCESS_LOCK);
-    g_debug("%s: File handle closed, but the driver is unlocked and this thread will yield.", "WIN_ALLOC-CLOSE");
+    g_debug("HANDLE %d closed. The driver will be unlocked and this thread will yield.",
+            INT_INFO(*dev)->k_com);
     g_thread_yield();
     g_mutex_lock(ACCESS_LOCK);
-    g_debug("%s: Thread returned from yield. The resource is locked and will be freed now.", "WIN_ALLOC-CLOSE");
+    g_debug(
+        "Thread returned from yield for HANDLE %d. The driver will be permanently locked and freed.",
+        INT_INFO(*dev)->k_com);
     free_sources(dev);
   }
 }

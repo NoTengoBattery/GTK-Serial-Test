@@ -40,7 +40,7 @@ GtkWidget *output_swo[APP_SWO_SIZE];
 GtkWidget *hex_tbi;
 GtkWidget *hex_tbo;
 volatile char *print_format;
-struct AbstractSerialDevice *abstract_port;
+struct AbstractSerialDevice *abstract_port = NULL;
 GString *os_port;
 gchar data_readed;
 
