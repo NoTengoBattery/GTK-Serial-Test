@@ -42,7 +42,6 @@ GtkWidget *hex_tbo;
 volatile char *print_format;
 struct AbstractSerialDevice *abstract_port;
 GString *os_port;
-GThread *port_listener;
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                   Funciones extra
@@ -212,18 +211,91 @@ void setup_port_diag(GtkButton *button, GtkWindow *window) {
       break;
     case GTK_RESPONSE_REJECT://
       break;
-    default:break;
+    default://
+      break;
   }
 
   // Destruir hasta que termine de usarlo
   gtk_widget_destroy(GTK_WIDGET(setup_port_dialog));
 }
 
+void send_byte(GtkButton *button, GtkWindow *window) {
+  // Obtiene el valor binario a partir de lo switches
+  unsigned long val = 0x00;
+  for (int i = 0; i < APP_SWI_SIZE; i++) {
+    unsigned long binval = (unsigned long) gtk_switch_get_state(GTK_SWITCH(input_swi[i]));
+    binval = (binval & 0x01);
+    val |= binval << i;
+  }
+  gboolean success = abstract_port->write_byte((gchar) val, &abstract_port);
+  if (!success) {
+    GtkWidget *error_send_serial = gtk_message_dialog_new(GTK_WINDOW(window),
+                                                          GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                                                          GTK_MESSAGE_ERROR,
+                                                          GTK_BUTTONS_CLOSE,
+                                                          "No se ha enviado el byte con valor “%d”: %s",
+                                                          (int) val,
+                                                          g_strerror(errno));
+    gtk_dialog_run(GTK_DIALOG(error_send_serial));
+    gtk_widget_destroy(GTK_WIDGET(error_send_serial));
+  }
+}
+
+void deactivate(GtkWidget *object, gpointer user_data) {
+  // Libera el puerto serial
+  close_serial_port(&abstract_port);
+}
+
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                 Hilos de ejecución
 //===--------------------------------------------------------------------------------------------------------------===//
+gboolean update_from_serial(gpointer data) {
+  guchar readed = *((guchar *) data);
+  for (int i = 0; i < APP_SWO_SIZE; i++) {
+    gboolean bit_n = (gboolean) ((readed >> i) & 0x01);
+    gtk_switch_set_state(GTK_SWITCH(output_swo[i]), bit_n);
+  }
+  char *use_format = "";
+  char formatted[10];
+  // Detecta el formato de salida
+  if (strcmp((const char *) print_format, APP_STR_ASCII)==0) {
+    // Usar el valor decimal con un \ para los valores de 0 a 31.
+    // De 31 a 254, usar el valor ASCII normal
+    switch (readed) {
+      case 0 ... 31://
+        use_format = "\'\\%02d\'";
+        break;
+      case 0x7F://
+        use_format = "\'\\DEL\'";
+        break;
+      case 0x80 ... 0xFF://
+        use_format = "\'\\-%02d\'";
+        break;
+      default://
+        use_format = "\'%c\'";
+        break;
+    }
+  } else if (strcmp((const char *) print_format, APP_STR_HEX)==0) {
+    use_format = "0x%02X";
+  } else if (strcmp((const char *) print_format, APP_STR_DEC)==0) {
+    use_format = "%d";
+  } else if (strcmp((const char *) print_format, APP_STR_OCT)==0) {
+    use_format = "0%0o";
+  }
+  sprintf(formatted, use_format, readed);
+  gtk_entry_set_text(GTK_ENTRY(hex_tbo), formatted);
+  return FALSE;
+}
 static gpointer blocking_listener(gpointer user_data) {
-
+  while (abstract_port!=NULL) {
+    errno = 0x00;
+    gchar readed = abstract_port->read_byte(&abstract_port);
+    if (errno==ECANCELED) {
+      return NULL;
+    }
+    gdk_threads_add_idle(update_from_serial, &readed);
+  }
+  return NULL;
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -367,6 +439,16 @@ static void activate(GtkApplication *app, gpointer user_data) {
   g_signal_connect(hex_tbi, "activate", G_CALLBACK(on_inputhex_change), NULL);
   // Conecta al botón para mostrar el menú de configuración
   g_signal_connect(setup_port, "clicked", G_CALLBACK(setup_port_diag), window);
+  // Conecta al botón para enviar el byte
+  g_signal_connect(send_bto, "clicked", G_CALLBACK(send_byte), window);
+  // Conecta la aplicación a la señal `destroy`, que finaliza el hilo escucha
+  g_signal_connect(window, "destroy", G_CALLBACK(deactivate), NULL);
+
+  /*
+   * En realidad no estoy seguro de lo que pasa en Windows al crear un nuevo g_thread. En POSIX pues tenemos
+   * Posix Thread (pthreads) y soporte completo para los hilos de C11. Voy a suponer que GTK sabe lo mejor para Windows.
+   */
+  g_thread_new(NULL, blocking_listener, NULL);
 
   // Muestra la ventana ya diseñada
   gtk_widget_show_all(window);
@@ -386,18 +468,11 @@ int main(int argc, char **argv) {
   app = gtk_application_new(APP_ID, G_APPLICATION_FLAGS_NONE);
   // Conecta la aplicación a la señal `activate`, con el callback a la función `activate`, sin datos para pasar
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
-  /*
-   * En realidad no estoy seguro de lo que pasa en Windows al crear un nuevo g_thread. En POSIX pues tenemos
-   * Posix Thread (pthreads) y soporte completo para los hilos de C11. Voy a suponer que GTK sabe lo mejor para Windows.
-   */
-  port_listener = g_thread_new(NULL, blocking_listener, NULL);
+
   // Lanza la aplicación `app` de GTK, con los argumentos argc, argv y bloquea hasta que la aplicación termina
   status = g_application_run(G_APPLICATION(app), argc, argv);
   // Libera la instancia de la `app` (liberando memoria)
   g_object_unref(app);
-
-  // Libera recursos
-  close_serial_port(&abstract_port);
 
   // Retorna
   return status;

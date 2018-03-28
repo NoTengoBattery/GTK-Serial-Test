@@ -81,7 +81,7 @@ struct AbstractSerialDevice {
   // Escribir un byte al puerto
   gboolean (*write_byte)(gchar byte, struct AbstractSerialDevice **dev);
   // Leer un byte del puerto. Bloquea el hilo hasta que se lea
-  char (read_byte_and_block)(struct AbstractSerialDevice **dev);
+  char (*read_byte)(struct AbstractSerialDevice **dev);
 };
 
 // Esta función toma un puntero a un puntero de un Abstract Serial Device, reserva memoria, abre el puerto y devuelve
