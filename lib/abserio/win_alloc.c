@@ -38,30 +38,78 @@ struct InternalRepresentation {
 //                                           Implementación de la interfaz
 //===--------------------------------------------------------------------------------------------------------------===//
 gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
+  if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    (INT_INFO(*dev)->params)->BaudRate = (DWORD) baud_rate;
+    gboolean eval = SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
+    errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    return eval;
+  }
+  errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
   return FALSE;
 }
 
 glong get_baud_rate(struct AbstractSerialDevice **dev) {
+  if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    return (INT_INFO(*dev)->params)->BaudRate;
+  }
+  errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
   return -1;
 }
 
 gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, struct AbstractSerialDevice **dev) {
+  if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    (INT_INFO(*dev)->params)->fParity = (DWORD) bit_enable;
+    (INT_INFO(*dev)->params)->Parity = (BYTE) (bit_enable ? (BYTE) (odd_neven ? ODDPARITY : EVENPARITY) : NOPARITY);
+    gboolean eval = SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
+    errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    return eval;
+  }
+  errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
   return FALSE;
 }
 
 gboolean get_parity_bit(struct AbstractSerialDevice **dev) {
+  if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    return (gboolean) (INT_INFO(*dev)->params)->fParity;
+  }
+  errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
   return FALSE;
 }
 
 gboolean get_parity_odd_neven(struct AbstractSerialDevice **dev) {
+  if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    return (INT_INFO(*dev)->params)->Parity==ODDPARITY ? TRUE : FALSE;
+  }
+  errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
   return FALSE;
 }
 
 gboolean set_software_control_flow(gboolean bit_enable, struct AbstractSerialDevice **dev) {
+  if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    if (bit_enable) {
+      (INT_INFO(*dev)->params)->fOutX = TRUE;
+      (INT_INFO(*dev)->params)->fInX = TRUE;
+    } else {
+      (INT_INFO(*dev)->params)->fOutX = FALSE;
+      (INT_INFO(*dev)->params)->fInX = FALSE;
+    }
+    gboolean eval = SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
+    errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    return eval;
+  }
+  errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
   return FALSE;
 }
 
 gboolean get_software_control_flow(struct AbstractSerialDevice **dev) {
+  if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
+    errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
+    return (gboolean) (INT_INFO(*dev)->params)->fInX;
+  }
+  errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
   return FALSE;
 }
 
@@ -124,6 +172,12 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
       (*dev)->get_parity_odd_neven = get_parity_odd_neven;
       (*dev)->set_software_control_flow = set_software_control_flow;
       (*dev)->get_software_control_flow = get_software_control_flow;
+
+      // Configuracion inicial
+      (INT_INFO(*dev)->params)->ByteSize = 0x08;
+      (INT_INFO(*dev)->params)->fParity = TRUE;
+      (INT_INFO(*dev)->params)->Parity = ODDPARITY;
+      SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
     } else {
       // No se puede obtener información del puerto COM
       _set_errno((int) GetLastError());

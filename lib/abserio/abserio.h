@@ -78,6 +78,10 @@ struct AbstractSerialDevice {
   gboolean (*set_software_control_flow)(gboolean bit_enable, struct AbstractSerialDevice **dev);
   // Devuelve el estado del bit de control por software
   gboolean (*get_software_control_flow)(struct AbstractSerialDevice **dev);
+  // Escribir un byte al puerto
+  gboolean (*write_byte)(gchar byte, struct AbstractSerialDevice **dev);
+  // Leer un byte del puerto. Bloquea el hilo hasta que se lea
+  char (read_byte_and_block)(struct AbstractSerialDevice **dev);
 };
 
 // Esta función toma un puntero a un puntero de un Abstract Serial Device, reserva memoria, abre el puerto y devuelve
