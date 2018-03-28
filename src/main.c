@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <abserio/abserio.h>
 #include <errno.h>
+#include <memory.h>
 #ifdef _WIN32
 #include <stdint.h>
 #endif
@@ -251,7 +252,6 @@ void deactivate(GtkWidget *object, gpointer user_data) {
 //===--------------------------------------------------------------------------------------------------------------===//
 gboolean update_from_serial(gpointer data) {
   guchar readed = *((guchar *) data);
-  g_debug("Read event: got a char with value \'%d\'.", readed);
   for (int i = 0; i < APP_SWO_SIZE; i++) {
     gboolean bit_n = (gboolean) ((readed >> i) & 0x01);
     gtk_switch_set_state(GTK_SWITCH(output_swo[i]), bit_n);
@@ -292,7 +292,6 @@ static gpointer blocking_listener(gpointer user_data) {
     errno = 0x00;
     data_readed = abstract_port->read_byte(&abstract_port);
     if (errno==ECANCELED) {
-      g_debug("Read operation cancelled.");
       return NULL;
     }
     gdk_threads_add_idle(update_from_serial, &data_readed);

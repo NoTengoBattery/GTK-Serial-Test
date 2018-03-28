@@ -45,5 +45,4 @@
 #define APP_DIALOG_PARITY_ODD           "Bit par/!impar: "
 #define APP_DIALOG_SWCTL                "Control de flujo por software: "
 
-
 #endif // CONFIG_H

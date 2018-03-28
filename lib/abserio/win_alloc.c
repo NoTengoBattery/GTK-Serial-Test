@@ -20,6 +20,9 @@
 /// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363214(v=vs.85).aspx
 ///
 //===--------------------------------------------------------------------------------------------------------------===//
+
+
+#define G_LOG_DOMAIN                    "WindowsDriver"
 #include "abserio.h"
 #include <stdatomic.h>
 
@@ -76,7 +79,7 @@ gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, struct Abstract
   g_mutex_lock(ACCESS_LOCK);
   if (GetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params)) {
     (INT_INFO(*dev)->params)->fParity = (DWORD) bit_enable;
-    (INT_INFO(*dev)->params)->Parity = (BYTE) (bit_enable ? (BYTE) (odd_neven ? ODDPARITY : EVENPARITY) : NOPARITY);
+    (INT_INFO(*dev)->params)->Parity = (BYTE)(bit_enable ? (BYTE)(odd_neven ? ODDPARITY : EVENPARITY) : NOPARITY);
     gboolean eval = SetCommState(INT_INFO(*dev)->k_com, INT_INFO(*dev)->params);
     errno = (int) (GetLastError()!=0 ? GetLastError() : (DWORD) errno);
     g_mutex_unlock(ACCESS_LOCK);
@@ -187,6 +190,7 @@ char read_byte(struct AbstractSerialDevice **dev) {
     g_mutex_unlock(ACCESS_LOCK);
     g_thread_yield();
   } while (n!=1);
+  g_debug("%s: Returning from blocking-read, with a read value of '%d'.", "WIN_ALLOC-READ", readed);
   return readed;
 }
 
@@ -298,7 +302,7 @@ void close_serial_port(struct AbstractSerialDevice **dev) {
     g_debug("%s: File handle closed, but the driver is unlocked and this thread will yield.", "WIN_ALLOC-CLOSE");
     g_thread_yield();
     g_mutex_lock(ACCESS_LOCK);
-    g_debug("%s: Thread returned from yield. The resource will be locked and freed now.", "WIN_ALLOC-CLOSE");
+    g_debug("%s: Thread returned from yield. The resource is locked and will be freed now.", "WIN_ALLOC-CLOSE");
     free_sources(dev);
   }
 }

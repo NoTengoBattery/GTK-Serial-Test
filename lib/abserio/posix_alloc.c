@@ -20,12 +20,13 @@
 ///
 //===--------------------------------------------------------------------------------------------------------------===//
 
+#define G_LOG_DOMAIN                    "PosixDriver"
 #include "abserio.h"
+#include <errno.h>
 #include <fcntl.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdatomic.h>
-#include <errno.h>
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                 Estructuras de datos
@@ -38,6 +39,7 @@ struct InternalRepresentation {
   GMutex write_lock;
   GMutex access_lock;
   volatile atomic_bool open;
+  struct timeval timeout;
 };
 
 #define IR(x)                           ((struct InternalRepresentation *) (x))
@@ -45,6 +47,7 @@ struct InternalRepresentation {
 #define READ_LOCK                       &INT_INFO(*dev)->read_lock
 #define WRITE_LOCK                      &INT_INFO(*dev)->write_lock
 #define ACCESS_LOCK                     &INT_INFO(*dev)->access_lock
+#define PRINT_ERRNO(x)                  x("Message: \'%s\'", g_strerror(errno))
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                           Implementación de la interfaz
@@ -65,6 +68,11 @@ gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
       }
     }
   }
+  g_critical("Unable to change baud rate to \'%lu\'. Restoring the original baud rate (I:%lu, O:%lu).",
+             baud_rate,
+             was_ispeed,
+             was_ospeed);
+  PRINT_ERRNO(g_critical);
   cfsetispeed(INT_INFO(*dev)->options, (speed_t) was_ispeed);
   cfsetospeed(INT_INFO(*dev)->options, (speed_t) was_ospeed);
   tcsetattr(INT_INFO(*dev)->kernel_fd, TCSANOW, INT_INFO(*dev)->options);
@@ -82,6 +90,8 @@ glong get_baud_rate(struct AbstractSerialDevice **dev) {
     g_mutex_unlock(ACCESS_LOCK);
     return out_speed;
   }
+  g_critical("Unable to get baud rate info from OS.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return -1;
 }
@@ -109,6 +119,8 @@ gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, struct Abstract
       return TRUE;
     }
   }
+  g_critical("Unable to set parity bits configuration. Won't restore original.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -143,6 +155,8 @@ gboolean set_software_control_flow(gboolean bit_enable, struct AbstractSerialDev
     g_mutex_unlock(ACCESS_LOCK);
     return TRUE;
   }
+  g_critical("Unable to set software control configuration. Won't restore original.");
+  PRINT_ERRNO(g_critical);
   g_mutex_unlock(ACCESS_LOCK);
   return FALSE;
 }
@@ -156,35 +170,54 @@ gboolean get_software_control_flow(struct AbstractSerialDevice **dev) {
 }
 
 gboolean write_byte(gchar byte, struct AbstractSerialDevice **dev) {
-  g_mutex_lock(WRITE_LOCK);
-  g_mutex_lock(ACCESS_LOCK);
-  ssize_t n = write(INT_INFO(*dev)->kernel_fd, &byte, 1);
-  g_mutex_unlock(ACCESS_LOCK);
-  g_mutex_unlock(WRITE_LOCK);
-  return n==1 ? TRUE : FALSE;
+  gboolean isReading = !(g_mutex_trylock(READ_LOCK));
+  ssize_t n;
+  if (isReading) {
+    g_mutex_lock(WRITE_LOCK);
+    g_debug("Performing \'write\' operation while a \'read\' operation is running.");
+    n = write(INT_INFO(*dev)->kernel_fd, &byte, 1);
+    g_mutex_unlock(WRITE_LOCK);
+  } else {
+    // Debido a que trylock realmente bloquea el mutex, hay que desbloquearlo. De otra forma, se tiene un lindo death
+    // lock
+    g_mutex_unlock(READ_LOCK);
+    g_mutex_lock(ACCESS_LOCK);
+    g_mutex_lock(WRITE_LOCK);
+    n = write(INT_INFO(*dev)->kernel_fd, &byte, 1);
+    g_mutex_unlock(WRITE_LOCK);
+    g_mutex_unlock(ACCESS_LOCK);
+  }
+  if (n==1) {
+    return TRUE;
+  }
+  g_critical("Returning with an invalid number of bytes sent. Expected %d, sent %d", 1, (int) n);
+  PRINT_ERRNO(g_critical);
+  return FALSE;
 }
 
 char read_byte(struct AbstractSerialDevice **dev) {
   ssize_t r;
   fd_set set;
-  struct timeval timeout;
-  timeout.tv_sec = 0;
-  timeout.tv_usec = (1000000/60);
   do {
-    g_mutex_lock(ACCESS_LOCK);
     if (*dev==NULL) {
+      g_debug("Read operation cancelled: resource not available.");
       errno = ECANCELED;
       return -1;
     }
+    g_mutex_lock(ACCESS_LOCK);
     if (INT_INFO(*dev)->open==FALSE) {
       g_mutex_unlock(ACCESS_LOCK);
+      g_debug("Read operation cancelled: file is closed.");
       errno = ECANCELED;
       return -1;
     }
     FD_ZERO(&set);
     FD_SET(INT_INFO(*dev)->kernel_fd, &set);
-    select(INT_INFO(*dev)->kernel_fd + 1, &set, NULL, NULL, &timeout);
+    g_mutex_lock(READ_LOCK);
+    select(INT_INFO(*dev)->kernel_fd + 1, &set, NULL, NULL, &INT_INFO(*dev)->timeout);
+    g_mutex_unlock(READ_LOCK);
     g_mutex_unlock(ACCESS_LOCK);
+    g_thread_yield();
   } while (!FD_ISSET(INT_INFO(*dev)->kernel_fd, &set));
   char oneByte;
   g_mutex_lock(ACCESS_LOCK);
@@ -192,7 +225,11 @@ char read_byte(struct AbstractSerialDevice **dev) {
   r = read(INT_INFO(*dev)->kernel_fd, &oneByte, 1);
   g_mutex_unlock(READ_LOCK);
   g_mutex_unlock(ACCESS_LOCK);
-  return (char) (r==1 ? oneByte : -1);
+  if (r==1) {
+    g_debug("Returning from blocking-read, read '%d' from port.", oneByte);
+    return oneByte;
+  }
+  return (char) -1;
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -202,15 +239,18 @@ void free_sources(struct AbstractSerialDevice **dev) {
   g_mutex_clear(ACCESS_LOCK);
   g_mutex_clear(READ_LOCK);
   g_mutex_clear(WRITE_LOCK);
+  g_debug("Freeing driver resources for Kernel File Descriptor %d.", INT_INFO(*dev)->kernel_fd);
   free(INT_INFO(*dev)->options);
   free(INT_INFO(*dev));
   free(*dev);
+  g_debug("Driver deallocate: setting driver pointer to NULL.");
   *dev = NULL;
 }
 
 gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
   if (dev==NULL || *dev!=NULL) {
     // Si no es NULL, podemos estar cayendo encima de un driver reservado que ya no se podrá liberar.
+    g_error("Trying to allocate a driver in a pointer which is not NULL. This is considered a bug.");
     return FALSE;
   }
   if (os_dev!=NULL && os_dev->str!=NULL) {
@@ -218,6 +258,7 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
     *dev = malloc(sizeof(struct AbstractSerialDevice));
     (*dev)->_internal_info = malloc(sizeof(struct InternalRepresentation));
     INT_INFO(*dev)->options = malloc(sizeof(struct termios));
+
     // Inicializar los mutex
     g_mutex_init(ACCESS_LOCK);
     g_mutex_init(READ_LOCK);
@@ -253,7 +294,18 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
     (*dev)->get_software_control_flow = get_software_control_flow;
     (*dev)->write_byte = write_byte;
     (*dev)->read_byte = read_byte;
+
+    // Timeout
+    INT_INFO(*dev)->timeout.tv_sec = 0;
+    // 60 veces por segundo
+    INT_INFO(*dev)->timeout.tv_usec = (1000000/60);
+    g_debug("Driver polling timeout: %.6f.",
+            INT_INFO(*dev)->timeout.tv_sec + (INT_INFO(*dev)->timeout.tv_usec/1000000.0));
+
     g_mutex_unlock(ACCESS_LOCK);
+    g_debug("Successfully created a driver for the file \'%s\' (Kernel File Descriptor: %d).",
+            os_dev->str,
+            INT_INFO(*dev)->kernel_fd);
     return TRUE;
   }
   return FALSE;
@@ -265,7 +317,13 @@ void close_serial_port(struct AbstractSerialDevice **dev) {
     INT_INFO(*dev)->open = FALSE;
     close(INT_INFO(*dev)->kernel_fd);
     g_mutex_unlock(ACCESS_LOCK);
+    g_debug("Kernel File Descriptor %d closed. The driver will be unlocked and this thread will yield.",
+            INT_INFO(*dev)->kernel_fd);
+    g_thread_yield();
     g_mutex_lock(ACCESS_LOCK);
+    g_debug(
+        "Thread returned from yield for Kernel File Descriptor %d. The driver will be permanently locked and freed.",
+        INT_INFO(*dev)->kernel_fd);
     free_sources(dev);
   }
 }
