@@ -19,7 +19,6 @@
 
 #include "config.h"
 #include <gtk/gtk.h>
-#include <memory.h>
 #include <stdlib.h>
 #include <abserio/abserio.h>
 #include <errno.h>
@@ -42,6 +41,7 @@ GtkWidget *hex_tbo;
 volatile char *print_format;
 struct AbstractSerialDevice *abstract_port;
 GString *os_port;
+gchar data_readed;
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                   Funciones extra
@@ -251,6 +251,7 @@ void deactivate(GtkWidget *object, gpointer user_data) {
 //===--------------------------------------------------------------------------------------------------------------===//
 gboolean update_from_serial(gpointer data) {
   guchar readed = *((guchar *) data);
+  g_debug("Read event: got a char with value \'%d\'.", readed);
   for (int i = 0; i < APP_SWO_SIZE; i++) {
     gboolean bit_n = (gboolean) ((readed >> i) & 0x01);
     gtk_switch_set_state(GTK_SWITCH(output_swo[i]), bit_n);
@@ -289,15 +290,15 @@ gboolean update_from_serial(gpointer data) {
 static gpointer blocking_listener(gpointer user_data) {
   while (abstract_port!=NULL) {
     errno = 0x00;
-    gchar readed = abstract_port->read_byte(&abstract_port);
+    data_readed = abstract_port->read_byte(&abstract_port);
     if (errno==ECANCELED) {
+      g_debug("Read operation cancelled.");
       return NULL;
     }
-    gdk_threads_add_idle(update_from_serial, &readed);
+    gdk_threads_add_idle(update_from_serial, &data_readed);
   }
   return NULL;
 }
-
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                              Inicialización de la GUI
 //===--------------------------------------------------------------------------------------------------------------===//

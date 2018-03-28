@@ -169,7 +169,7 @@ char read_byte(struct AbstractSerialDevice **dev) {
   fd_set set;
   struct timeval timeout;
   timeout.tv_sec = 0;
-  timeout.tv_usec = 25000;
+  timeout.tv_usec = (1000000/60);
   do {
     g_mutex_lock(ACCESS_LOCK);
     if (*dev==NULL) {
@@ -265,6 +265,7 @@ void close_serial_port(struct AbstractSerialDevice **dev) {
     INT_INFO(*dev)->open = FALSE;
     close(INT_INFO(*dev)->kernel_fd);
     g_mutex_unlock(ACCESS_LOCK);
+    g_mutex_lock(ACCESS_LOCK);
     free_sources(dev);
   }
 }
