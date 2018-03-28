@@ -42,6 +42,7 @@ GtkWidget *hex_tbo;
 volatile char *print_format;
 struct AbstractSerialDevice *abstract_port;
 GString *os_port;
+GThread *port_listener;
 
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                   Funciones extra
@@ -219,6 +220,13 @@ void setup_port_diag(GtkButton *button, GtkWindow *window) {
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
+//                                                 Hilos de ejecución
+//===--------------------------------------------------------------------------------------------------------------===//
+static gpointer blocking_listener(gpointer user_data) {
+
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
 //                                              Inicialización de la GUI
 //===--------------------------------------------------------------------------------------------------------------===//
 static void activate(GtkApplication *app, gpointer user_data) {
@@ -378,6 +386,11 @@ int main(int argc, char **argv) {
   app = gtk_application_new(APP_ID, G_APPLICATION_FLAGS_NONE);
   // Conecta la aplicación a la señal `activate`, con el callback a la función `activate`, sin datos para pasar
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+  /*
+   * En realidad no estoy seguro de lo que pasa en Windows al crear un nuevo g_thread. En POSIX pues tenemos
+   * Posix Thread (pthreads) y soporte completo para los hilos de C11. Voy a suponer que GTK sabe lo mejor para Windows.
+   */
+  port_listener = g_thread_new(NULL, blocking_listener, NULL);
   // Lanza la aplicación `app` de GTK, con los argumentos argc, argv y bloquea hasta que la aplicación termina
   status = g_application_run(G_APPLICATION(app), argc, argv);
   // Libera la instancia de la `app` (liberando memoria)
