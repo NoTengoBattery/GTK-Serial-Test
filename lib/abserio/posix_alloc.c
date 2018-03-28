@@ -28,7 +28,6 @@
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                                 Estructuras de datos
 //===--------------------------------------------------------------------------------------------------------------===//
-
 // Estructura de datos interna
 struct InternalRepresentation {
   int kernel_fd;
@@ -41,7 +40,6 @@ struct InternalRepresentation {
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                           Implementación de la interfaz
 //===--------------------------------------------------------------------------------------------------------------===//
-
 gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
   // Obtener la información de TERMIOS
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -132,7 +130,6 @@ gboolean get_software_control_flow(struct AbstractSerialDevice **dev) {
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                          Funciones de control del puerto
 //===--------------------------------------------------------------------------------------------------------------===//
-
 void free_sources(struct AbstractSerialDevice **dev) {
   free(INT_INFO(*dev)->options);
   free(INT_INFO(*dev));

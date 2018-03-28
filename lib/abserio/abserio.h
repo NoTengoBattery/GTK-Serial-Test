@@ -17,7 +17,8 @@
 ///
 //===--------------------------------------------------------------------------------------------------------------===//
 
-
+#ifndef ABSERIO_H
+#define ABSERIO_H
 #include <glib.h>
 
 #ifdef _WIN32
@@ -53,8 +54,8 @@
 #endif // _WIN32
 
 #define BAUDS_AVAIL                     15
-#define PARITY_ODD                      TRUE
-#define PARITY_EVEN                     FALSE
+#define SET_PARITY_ODD                  TRUE
+#define SET_PARITY_EVEN                 FALSE
 #define PARITY_ENABLE                   TRUE
 #define PARITY_DISABLE                  FALSE
 extern const long bauds[BAUDS_AVAIL];
@@ -90,3 +91,4 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev);
 
 // Esta función cierra un puerto serial y libera los recursos asociados.
 void close_serial_port(struct AbstractSerialDevice **dev);
+#endif // ABSERIO_H

@@ -18,6 +18,7 @@
 #   -> pkg-config
 #   -> Compilador nativo de C compatible con C11
 #   -> GTK+ 3.0
+#   -> glib2
 #   -> Cualquier generador soportado por CMake y su respectivo ambiente
 #
 # Este programa funciona en Windows, macOS y Linux.
@@ -48,12 +49,14 @@
 #     -> Se necesita un generador para CMake. Se puede usar ninja, pero make es más conveniente. Se instala desde el
 #        paquete `mingw-w64-x86_64-make`
 #     -> Finalmente, se instala GTK 3 desde el paquete `mingw-w64-x86_64-gtk3`
+#     -> GTK tiene como dependencia a glib, así que no hace falta instalar por separado
 #
 # # Linux
 #   Los paquetes necesarios son:
 #     -> cmake
 #     -> base-devel
 #     -> gtk3
+#     -> glib
 #     -> pkg-config
 #     -> clang/gcc
 #
