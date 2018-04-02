@@ -27,11 +27,13 @@
 #   Es necesario instalar macports. Macports, a su vez, tiene como dependencia Xcode. Esto quiere decir que hay que
 #   instalar Xcode y después macports.
 #
-#   Desde macports se puede instalar GTK (variante Quartz): `port install gtk3 +quartz`
-#   También se puede conseguir CMake: `port install cmake`
-#   pkg-config es parte de Xcode y la mayoría de paquetes de macports lo utilizan
-#   Apple provee una versión de Clang junto con Xcode y el SDK de macOS (Cocoa/Quartz)
-#   De la misma cuenta, Apple provee versiones de Git y de GNU Make.
+#   Desde macports se puede instalar GTK (variante Quartz):
+#     ->  `port install gtk3 +quartz-x11`
+#   También se puede conseguir CMake:
+#     ->  `port install cmake`
+#   `pkg-config` y `glib2` son dependencias de GTK3, no hace falta instalarlos por separado.
+#   Apple provee una versión de Clang junto con Xcode y el SDK de macOS (Cocoa/Quartz), la cual funciona tal cual viene
+#   De la misma cuenta, Apple provee versiones de Git y de Make.
 #
 # # Windows
 #   GTK no se puede desarrollar directamente sobre Windows. El primer paso fundamental es adquirir el entorno de
@@ -39,17 +41,26 @@
 #   (oficialmente) ningún otro entorno.
 #
 #   Luego de configurar MSYS2, desde la terminal de Mingw64 o Mingw32 se deben instalar los siguientes paquetes para
-#   Windows de 64 bits
-#     -> Instalar pgk-config desde el paquete `mingw-w64-x86_64-pkg-config`
-#     -> Instalar CMake desde el paquete `mingw-w64-x86_64-cmake`
-#     -> Instalar un compilador, ya sea GCC desde el paquete `mingw-w64-x86_64-gcc`
-#        o Clang desde el paquete `mingw-w64-x86_64-clang`
-#     -> Es buena idea instalar un depurador (opcional) desde los paquetes `mingw-w64-x86_64-lldb` para LLDB
-#        o `mingw-w64-x86_64-gdb` para GDB
-#     -> Se necesita un generador para CMake. Se puede usar ninja, pero make es más conveniente. Se instala desde el
-#        paquete `mingw-w64-x86_64-make`
-#     -> Finalmente, se instala GTK 3 desde el paquete `mingw-w64-x86_64-gtk3`
-#     -> GTK tiene como dependencia a glib, así que no hace falta instalar por separado
+#   Windows de 64 bits (el entorno mínimo). El compilador y make se pueden instalar en un entorno más completo mediante
+#   el metapaquete `toolchain` y `base-devel`.
+#     Instalar pgk-config desde el paquete
+#       -> `mingw-w64-x86_64-pkg-config`
+#     Instalar CMake desde el paquete
+#       -> `mingw-w64-x86_64-cmake`
+#     Instalar un compilador, ya sea GCC desde el paquete
+#       -> `mingw-w64-x86_64-gcc`
+#     o Clang desde el paquete
+#       -> `mingw-w64-x86_64-clang`
+#     Es buena idea instalar un depurador (opcional) desde los paquetes, para LLDB
+#       -> `mingw-w64-x86_64-lldb`
+#     o GDB con el paquete
+#       -> `mingw-w64-x86_64-gdb`
+#     Se necesita un generador para CMake. Se puede usar ninja, pero make es más conveniente. Se instala desde el
+#     paquete
+#       -> `mingw-w64-x86_64-make`
+#     Finalmente, se instala GTK 3 desde el paquete
+#       -> `mingw-w64-x86_64-gtk3`
+#     GTK tiene como dependencia a glib, así que no hace falta instalar por separado
 #
 # # Linux
 #   Los paquetes necesarios son:
@@ -75,9 +86,10 @@ SET ( CMAKE_C_STANDARD_REQUIRED ON )
 # Usar pkg-config para encontrar GTK.
 #   -> La mayoría de gestores de paquetes de Linux soportan pkg-config
 #   -> En macOS, pkg-config funciona bien con GTK mediante macports
-#      En Mac, siempre instalar la variante +quartz de GTK
+#      En Mac, siempre instalar la variante +quartz-x11 de GTK (tiene menos dependencias y se ve mejor)
 #   -> En Windows, MSYS2 para Mingw64 funciona bien con pkg-config y GTK
 #      GTK solamente funciona desde la terminal Mingw32/64, no desde la de MSYS
+#      Como siempre, en Windows se deben incluir las DLL de MSYS, GTK y todas sus dependencias con el .exe
 FIND_PACKAGE ( PkgConfig REQUIRED )
 
 # Busca `gtk+-3.0` en pkg-config
