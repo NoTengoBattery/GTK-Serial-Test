@@ -65,23 +65,23 @@ struct AbstractSerialDevice {
   // Información interna
   void *_internal_info;
   // Esta función configura el baudrate
-  gboolean (*set_baud_rate)(glong baud_rate, struct AbstractSerialDevice **dev);
+  gboolean (*set_baud_rate)(glong, const struct AbstractSerialDevice **);
   // Esta función devuelve el baudrate actual
-  glong (*get_baud_rate)(struct AbstractSerialDevice **dev);
+  glong (*get_baud_rate)(const struct AbstractSerialDevice **);
   // Configura el bit de pariedad
-  gboolean (*set_parity_bit)(gboolean bit_enable, gboolean odd_neven, struct AbstractSerialDevice **dev);
+  gboolean (*set_parity_bit)(gboolean, gboolean, const struct AbstractSerialDevice **);
   // Devuelve el estado del bit de pariedad
-  gboolean (*get_parity_bit)(struct AbstractSerialDevice **dev);
+  gboolean (*get_parity_bit)(const struct AbstractSerialDevice **);
   // Devuelve TRUE mientras el bit de pariedad sea impar
-  gboolean (*get_parity_odd_neven)(struct AbstractSerialDevice **dev);
+  gboolean (*get_parity_odd_neven)(const struct AbstractSerialDevice **);
   // Activa o desactiva el control por software del flujo de entrada/salida
-  gboolean (*set_software_control_flow)(gboolean bit_enable, struct AbstractSerialDevice **dev);
+  gboolean (*set_software_control_flow)(gboolean, const struct AbstractSerialDevice **);
   // Devuelve el estado del bit de control por software
-  gboolean (*get_software_control_flow)(struct AbstractSerialDevice **dev);
+  gboolean (*get_software_control_flow)(const struct AbstractSerialDevice **);
   // Escribir un byte al puerto
-  gboolean (*write_byte)(gchar byte, struct AbstractSerialDevice **dev);
+  gboolean (*write_byte)(gchar, const struct AbstractSerialDevice **);
   // Leer un byte del puerto. Bloquea el hilo hasta que se lea
-  char (*read_byte)(struct AbstractSerialDevice **dev);
+  char (*read_byte)(const struct AbstractSerialDevice **);
 };
 
 // Esta función toma un puntero a un puntero de un Abstract Serial Device, reserva memoria, abre el puerto y devuelve
@@ -91,8 +91,8 @@ struct AbstractSerialDevice {
 //  -> Intenta abrir el puerto
 //  -> Si falla, el puerto no se abre, el puntero se vuelve NULL y retorna FALSE
 //  -> Si lo logra, llena el driver con los pertinentes
-gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev);
+gboolean open_serial_port(const struct AbstractSerialDevice **, GString *);
 
 // Esta función cierra un puerto serial y libera los recursos asociados.
-void close_serial_port(struct AbstractSerialDevice **dev);
+void close_serial_port(const struct AbstractSerialDevice **);
 #endif // ABSERIO_H

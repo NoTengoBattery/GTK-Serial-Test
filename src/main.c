@@ -19,10 +19,8 @@
 
 #include "config.h"
 #include <gtk/gtk.h>
-#include <stdlib.h>
 #include <abserio/abserio.h>
 #include <errno.h>
-#include <memory.h>
 #ifdef _WIN32
 #include <stdint.h>
 #endif
@@ -40,7 +38,7 @@ GtkWidget *output_swo[APP_SWO_SIZE];
 GtkWidget *hex_tbi;
 GtkWidget *hex_tbo;
 volatile char *print_format;
-struct AbstractSerialDevice *abstract_port = NULL;
+const struct AbstractSerialDevice *abstract_port = NULL;
 GString *os_port;
 gchar data_readed;
 

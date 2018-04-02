@@ -25,7 +25,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdatomic.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -52,7 +51,8 @@ struct InternalRepresentation {
 //===--------------------------------------------------------------------------------------------------------------===//
 //                                           Implementación de la interfaz
 //===--------------------------------------------------------------------------------------------------------------===//
-gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
+gboolean set_baud_rate(glong baud_rate, const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   // Obtener la información de TERMIOS
   g_mutex_lock(ACCESS_LOCK);
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -80,7 +80,8 @@ gboolean set_baud_rate(glong baud_rate, struct AbstractSerialDevice **dev) {
   return FALSE;
 }
 
-glong get_baud_rate(struct AbstractSerialDevice **dev) {
+glong get_baud_rate(const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   // Obtener la información de TERMIOS
   g_mutex_lock(ACCESS_LOCK);
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -96,7 +97,8 @@ glong get_baud_rate(struct AbstractSerialDevice **dev) {
   return -1;
 }
 
-gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, struct AbstractSerialDevice **dev) {
+gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   // Obtener la información de TERMIOS
   g_mutex_lock(ACCESS_LOCK);
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -125,7 +127,8 @@ gboolean set_parity_bit(gboolean bit_enable, gboolean odd_neven, struct Abstract
   return FALSE;
 }
 
-gboolean get_parity_bit(struct AbstractSerialDevice **dev) {
+gboolean get_parity_bit(const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   // Obtener la información de TERMIOS
   g_mutex_lock(ACCESS_LOCK);
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -133,7 +136,7 @@ gboolean get_parity_bit(struct AbstractSerialDevice **dev) {
   return (gboolean) ((INT_INFO(*dev)->options)->c_cflag & PARENB);
 }
 
-gboolean get_parity_odd_neven(struct AbstractSerialDevice **dev) {
+gboolean get_parity_odd_neven(const struct AbstractSerialDevice **dev) {
   // Obtener la información de TERMIOS
   g_mutex_lock(ACCESS_LOCK);
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -141,7 +144,8 @@ gboolean get_parity_odd_neven(struct AbstractSerialDevice **dev) {
   return (gboolean) ((INT_INFO(*dev)->options)->c_cflag & PARODD);
 }
 
-gboolean set_software_control_flow(gboolean bit_enable, struct AbstractSerialDevice **dev) {
+gboolean set_software_control_flow(gboolean bit_enable, const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   // Obtener la información de TERMIOS
   g_mutex_lock(ACCESS_LOCK);
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -161,7 +165,8 @@ gboolean set_software_control_flow(gboolean bit_enable, struct AbstractSerialDev
   return FALSE;
 }
 
-gboolean get_software_control_flow(struct AbstractSerialDevice **dev) {
+gboolean get_software_control_flow(const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   // Obtener la información de TERMIOS
   g_mutex_lock(ACCESS_LOCK);
   tcgetattr(INT_INFO(*dev)->kernel_fd, INT_INFO(*dev)->options);
@@ -169,7 +174,8 @@ gboolean get_software_control_flow(struct AbstractSerialDevice **dev) {
   return (gboolean) ((INT_INFO(*dev)->options)->c_iflag & IXON);
 }
 
-gboolean write_byte(gchar byte, struct AbstractSerialDevice **dev) {
+gboolean write_byte(gchar byte, const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   gboolean isReading = !(g_mutex_trylock(READ_LOCK));
   ssize_t n;
   if (isReading) {
@@ -195,7 +201,8 @@ gboolean write_byte(gchar byte, struct AbstractSerialDevice **dev) {
   return FALSE;
 }
 
-char read_byte(struct AbstractSerialDevice **dev) {
+char read_byte(const struct AbstractSerialDevice **cdev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   ssize_t r;
   fd_set set;
   do {
@@ -247,7 +254,8 @@ void free_sources(struct AbstractSerialDevice **dev) {
   *dev = NULL;
 }
 
-gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
+gboolean open_serial_port(const struct AbstractSerialDevice **cdev, GString *os_dev) {
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   if (dev==NULL || *dev!=NULL) {
     // Si no es NULL, podemos estar cayendo encima de un driver reservado que ya no se podrá liberar.
     g_error("Trying to allocate a driver in a pointer which is not NULL. This is considered a bug.");
@@ -311,7 +319,9 @@ gboolean open_serial_port(struct AbstractSerialDevice **dev, GString *os_dev) {
   return FALSE;
 }
 
-void close_serial_port(struct AbstractSerialDevice **dev) {
+void close_serial_port(const struct AbstractSerialDevice **cdev) {
+
+  struct AbstractSerialDevice **dev = (struct AbstractSerialDevice **) cdev;
   if (dev!=NULL && *dev!=NULL) {
     g_mutex_lock(ACCESS_LOCK);
     INT_INFO(*dev)->open = FALSE;
