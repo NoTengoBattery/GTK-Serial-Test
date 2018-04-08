@@ -352,7 +352,7 @@ gboolean open_serial_port(const struct AbstractSerialDevice **cdev, GString *os_
     // No se puede obtener información del puerto COM
     g_mutex_unlock(ACCESS_LOCK);
     errno = EINVAL;
-    g_critical("Unable to read portinformation.");
+    g_critical("Unable to read port information.");
     PRINT_ERRNO(g_critical);
     free_sources(dev);
     return FALSE;
