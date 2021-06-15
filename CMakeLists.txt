@@ -75,6 +75,10 @@
 
 
 CMAKE_MINIMUM_REQUIRED ( VERSION 3.9 )
+
+# Proyecto de CMake para C
+PROJECT ( GTK_SERIAL C )
+
 IF ( ${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR} )
   MESSAGE ( FATAL_ERROR "In-source builds are not supported." )
 ENDIF ()
@@ -103,10 +107,6 @@ ADD_DEFINITIONS ( ${GTK3_CFLAGS_OTHER} )
 # Banderas extras para LD
 STRING ( REPLACE ";" " " GTK3_LDFLAGS_LD "${GTK3_LDFLAGS_OTHER}" )
 SET ( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GTK3_LDFLAGS_LD}" )
-
-# Proyecto de CMake para C
-PROJECT ( GTK_SERIAL C )
-
 
 # Contiene las bibliotecas que se compilan in-source
 ADD_SUBDIRECTORY ( lib )
